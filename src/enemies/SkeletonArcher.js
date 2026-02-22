@@ -3,7 +3,7 @@ import { Entity, getCachedImage, getCachedJson } from '../utils.js';
 
 export class SkeletonArcher extends Enemy {
     constructor(game, x, y) {
-        super(game, x, y, 40, 48, '#ffffff', 60, 120, 'skeleton_archer');
+        super(game, x, y, 40, 48, '#ffffff', 45, 120, 'skeleton_archer');
 
         // Sprite Sheet Assets
         this.fullSheet = getCachedImage('assets/skeleton_archer_full.png');
@@ -28,6 +28,8 @@ export class SkeletonArcher extends Enemy {
                 this.attackFrames = keys.slice(8, 16);
             }
         });
+
+        this.targetAimPos = { x: 0, y: 0 };
     }
 
     update(dt) {
@@ -48,6 +50,13 @@ export class SkeletonArcher extends Enemy {
             this.telegraphTimer -= dt;
             this.vx = 0;
             this.vy = 0;
+
+            // Lock aim 0.5s before firing
+            if (this.telegraphTimer > 0.5) {
+                this.targetAimPos.x = this.game.player.x + this.game.player.width / 2;
+                this.targetAimPos.y = this.game.player.y + this.game.player.height / 2;
+            }
+
             if (this.telegraphTimer <= 0) {
                 this.isTelegraphing = false;
                 this.executeAttack();
@@ -58,6 +67,8 @@ export class SkeletonArcher extends Enemy {
             const dist = Math.sqrt(dx * dx + dy * dy);
             const speedMult = this.statusManager.getSpeedMultiplier();
 
+            const hasLOS = this.hasLineOfSight();
+
             // Wander Logic: Change direction every 1.5-3.5 seconds
             this.wanderTimer -= dt;
             if (this.wanderTimer <= 0) {
@@ -67,12 +78,16 @@ export class SkeletonArcher extends Enemy {
                 this.wanderTimer = 1.5 + Math.random() * 2.0;
             }
 
-            // Movement AI: Relaxed Kiting & Randomness
+            // Movement AI: Relaxed Kiting & Randomness + LOS Check
             const kiteDist = 100;     // Too close: retreat (User requested 100px)
             const wanderDist = 400;   // Good range: wander randomly
             const approachDist = 500; // Too far: close in
 
-            if (dist < kiteDist) {
+            if (!hasLOS) {
+                // If no LOS, move towards player to find them
+                this.vx = (dx / dist) * this.speed * speedMult;
+                this.vy = (dy / dist) * this.speed * speedMult;
+            } else if (dist < kiteDist) {
                 // Move away (Relaxed retreat - now only if extremely close)
                 this.vx = -(dx / dist) * this.speed * speedMult;
                 this.vy = -(dy / dist) * this.speed * speedMult;
@@ -86,8 +101,8 @@ export class SkeletonArcher extends Enemy {
                 this.vy = (dy / dist) * this.speed * speedMult;
             }
 
-            // Attack Logic: Shoot if player is reasonably in range
-            if (dist < approachDist + 100) {
+            // Attack Logic: Shoot if player is reasonably in range AND visible
+            if (hasLOS && dist < approachDist + 100) {
                 this.shootTimer -= dt;
                 if (this.shootTimer <= 0) {
                     this.startTelegraph(1.0);
@@ -111,6 +126,32 @@ export class SkeletonArcher extends Enemy {
 
         // 3. Keep collision with player active
         this.checkPlayerCollision();
+    }
+
+    hasLineOfSight() {
+        const startX = this.x + this.width / 2;
+        const startY = this.y + this.height / 2;
+        const endX = this.game.player.x + this.game.player.width / 2;
+        const endY = this.game.player.y + this.game.player.height / 2;
+
+        const dx = endX - startX;
+        const dy = endY - startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist === 0) return true;
+
+        const step = 8;
+        const cos = dx / dist;
+        const sin = dy / dist;
+
+        for (let d = 0; d < dist; d += step) {
+            const rx = startX + cos * d;
+            const ry = startY + sin * d;
+            if (this.game.map.isWall(rx, ry)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     draw(ctx) {
@@ -167,9 +208,36 @@ export class SkeletonArcher extends Enemy {
 
         if (this.isTelegraphing) {
             ctx.save();
+            const startX = this.x + this.width / 2;
+            const startY = this.y + this.height / 2;
+            const dx = this.targetAimPos.x - startX;
+            const dy = this.targetAimPos.y - startY;
+            const angle = Math.atan2(dy, dx);
+
+            // Raycasting to find wall
+            let lineEndX = this.targetAimPos.x;
+            let lineEndY = this.targetAimPos.y;
+            const step = 8;
+            const maxDist = 2000;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+
+            for (let d = 0; d < maxDist; d += step) {
+                const rx = startX + cos * d;
+                const ry = startY + sin * d;
+                if (this.game.map.isWall(rx, ry)) {
+                    lineEndX = rx;
+                    lineEndY = ry;
+                    break;
+                }
+                // Fallback: stop at end of range if no wall found
+                lineEndX = rx;
+                lineEndY = ry;
+            }
+
             ctx.beginPath();
-            ctx.moveTo(this.x + this.width / 2, this.y + this.height / 2);
-            ctx.lineTo(this.game.player.x + this.game.player.width / 2, this.game.player.y + this.game.player.height / 2);
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(lineEndX, lineEndY);
             const progress = 1 - (this.telegraphTimer / this.telegraphDuration);
             ctx.strokeStyle = `rgba(255, 0, 0, ${0.2 + progress * 0.6})`;
             ctx.lineWidth = 1 + progress * 2;
@@ -184,15 +252,15 @@ export class SkeletonArcher extends Enemy {
         this.drawStatusIcons(ctx);
         if (this.hp < this.maxHp) {
             ctx.fillStyle = 'red';
-            ctx.fillRect(Math.floor(this.x), Math.floor(this.y - 6), this.width, 4);
+            ctx.fillRect(Math.floor(this.x), Math.floor(this.y - 35), this.width, 4);
             ctx.fillStyle = 'green';
-            ctx.fillRect(Math.floor(this.x), Math.floor(this.y - 6), this.width * (this.hp / this.maxHp), 4);
+            ctx.fillRect(Math.floor(this.x), Math.floor(this.y - 35), this.width * (this.hp / this.maxHp), 4);
         }
     }
 
     executeAttack() {
-        const dx = this.game.player.x - this.x;
-        const dy = this.game.player.y - this.y;
+        const dx = this.targetAimPos.x - (this.x + this.width / 2);
+        const dy = this.targetAimPos.y - (this.y + this.height / 2);
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         if (dist > 0) {
@@ -200,8 +268,8 @@ export class SkeletonArcher extends Enemy {
             this.game.enemyProjectiles.push({
                 x: this.x + this.width / 2,
                 y: this.y + this.height / 2,
-                vx: (dx / dist) * 546.875,
-                vy: (dy / dist) * 546.875,
+                vx: (dx / dist) * 650,
+                vy: (dy / dist) * 650,
                 width: 32,
                 height: 32,
                 angle: angle,

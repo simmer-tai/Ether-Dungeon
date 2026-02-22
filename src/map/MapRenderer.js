@@ -11,38 +11,122 @@ export class MapRenderer {
 
         for (let y = Math.max(0, startY); y < Math.min(this.map.height, endY); y++) {
             for (let x = Math.max(0, startX); x < Math.min(this.map.width, endX); x++) {
-                if (this.map.tiles[y][x] === 1) {
-                    const isFrontWall = y < this.map.height - 1 && this.map.tiles[y + 1][x] === 0;
-                    if (isFrontWall) {
-                        if (this.map.wallImage.complete && this.map.wallImage.naturalWidth !== 0) {
-                            ctx.drawImage(this.map.wallImage, Math.floor(x * this.map.tileSize), Math.floor(y * this.map.tileSize), this.map.tileSize, this.map.tileSize);
-                        } else {
-                            ctx.fillStyle = '#666';
-                            ctx.fillRect(Math.floor(x * this.map.tileSize), Math.floor(y * this.map.tileSize), this.map.tileSize, this.map.tileSize);
-                        }
-                    } else {
-                        ctx.fillStyle = '#333';
-                        ctx.fillRect(Math.floor(x * this.map.tileSize), Math.floor(y * this.map.tileSize), this.map.tileSize, this.map.tileSize);
-                        ctx.strokeStyle = '#222';
-                        ctx.strokeRect(Math.floor(x * this.map.tileSize), Math.floor(y * this.map.tileSize), this.map.tileSize, this.map.tileSize);
-                    }
-                } else if (this.map.tiles[y][x] === 2) {
+                if (this.map.tiles[y][x] === 1 || this.map.tiles[y][x] === 2) {
                     const tx = Math.floor(x * this.map.tileSize);
                     const ty = Math.floor(y * this.map.tileSize);
-                    ctx.fillStyle = '#330000';
-                    ctx.fillRect(tx, ty, this.map.tileSize, this.map.tileSize);
-                    ctx.strokeStyle = '#ff0000';
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(tx, ty + this.map.tileSize);
-                    ctx.lineTo(tx + this.map.tileSize, ty);
-                    ctx.moveTo(tx, ty + this.map.tileSize / 2);
-                    ctx.lineTo(tx + this.map.tileSize / 2, ty);
-                    ctx.moveTo(tx + this.map.tileSize / 2, ty + this.map.tileSize);
-                    ctx.lineTo(tx + this.map.tileSize, ty + this.map.tileSize / 2);
-                    ctx.stroke();
-                    ctx.strokeRect(tx, ty, this.map.tileSize, this.map.tileSize);
-                } else {
+                    const ts = this.map.tileSize;
+
+                    // Step 1: Default to solid black for any wall interior
+                    ctx.fillStyle = '#000';
+                    ctx.fillRect(tx, ty, ts, ts);
+
+                    // Step 2: Neighbor check (Cardinal floor check + Map edges)
+                    const isFloorS = y === this.map.height - 1 || this.map.tiles[y + 1][x] === 0;
+                    const isFloorN = y === 0 || this.map.tiles[y - 1][x] === 0;
+                    const isFloorW = x === 0 || this.map.tiles[y][x - 1] === 0;
+                    const isFloorE = x === this.map.width - 1 || this.map.tiles[y][x + 1] === 0;
+
+                    // Diagonals for special corner rims (only if cardinally surrounded by walls)
+                    const isFloorSW = y < this.map.height - 1 && x > 0 && this.map.tiles[y + 1][x - 1] === 0;
+                    const isFloorSE = y < this.map.height - 1 && x < this.map.width - 1 && this.map.tiles[y + 1][x + 1] === 0;
+                    const isAllWall = !isFloorN && !isFloorS && !isFloorW && !isFloorE;
+
+                    // Step 3: Render Southern Face (The main front texture)
+                    if (isFloorS && y < this.map.height - 1 && this.map.tiles[y + 1][x] === 0) {
+                        if (this.map.wallImage.complete && this.map.wallImage.naturalWidth !== 0) {
+                            ctx.drawImage(this.map.wallImage, tx, ty, ts, ts);
+                        } else {
+                            ctx.fillStyle = '#666'; // Fallback highlight
+                            ctx.fillRect(tx, ty, ts, ts);
+                        }
+                    }
+
+                    // Step 4: Add Gradient "Rims" for all exposed directions
+                    const rimSize = 10;
+                    // Side rims are suppressed on front-facing walls (isFloorS)
+                    // Exception: Draw side rim if surrounded by walls but has diagonal floor floor (inner corner)
+                    const hasWestRim = (isFloorW && !isFloorS) || (isAllWall && isFloorSW);
+                    const hasEastRim = (isFloorE && !isFloorS) || (isAllWall && isFloorSE);
+
+                    // North rim (Mitered) - Highlight/Thickness for the top edge
+                    if (isFloorN) {
+                        // Back-facing wall (Floor is to the North) - Draw inside
+                        const grad = ctx.createLinearGradient(tx, ty, tx, ty + rimSize);
+                        grad.addColorStop(0, '#555');
+                        grad.addColorStop(1, '#000');
+                        ctx.fillStyle = grad;
+
+                        const offsetW = hasWestRim ? rimSize : 0;
+                        const offsetE = hasEastRim ? rimSize : 0;
+
+                        ctx.beginPath();
+                        ctx.moveTo(tx, ty);
+                        ctx.lineTo(tx + ts, ty);
+                        ctx.lineTo(tx + ts - offsetE, ty + rimSize);
+                        ctx.lineTo(tx + offsetW, ty + rimSize);
+                        ctx.closePath();
+                        ctx.fill();
+                    } else if (isFloorS) {
+                        // Front-facing wall (Floor to the South) - Draw ABOVE the tile for thickness
+                        const grad = ctx.createLinearGradient(tx, ty - rimSize, tx, ty);
+                        grad.addColorStop(0, '#000'); // Darkest at the very top edge
+                        grad.addColorStop(1, '#555'); // Brighter at the wall face junction
+                        ctx.fillStyle = grad;
+
+                        // No side miters needed as side rims are suppressed on standard front walls
+                        ctx.fillRect(tx, ty - rimSize, ts, rimSize);
+                    }
+
+                    // West rim (Mitered)
+                    if (hasWestRim) {
+                        const grad = ctx.createLinearGradient(tx, ty, tx + rimSize, ty);
+                        grad.addColorStop(0, '#555');
+                        grad.addColorStop(1, '#000');
+                        ctx.fillStyle = grad;
+
+                        const offsetN = isFloorN ? rimSize : 0;
+
+                        ctx.beginPath();
+                        ctx.moveTo(tx, ty);
+                        ctx.lineTo(tx + rimSize, ty + offsetN);
+                        ctx.lineTo(tx + rimSize, ty + ts);
+                        ctx.lineTo(tx, ty + ts);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+
+                    // East rim (Mitered)
+                    if (hasEastRim) {
+                        const grad = ctx.createLinearGradient(tx + ts, ty, tx + ts - rimSize, ty);
+                        grad.addColorStop(0, '#555');
+                        grad.addColorStop(1, '#000');
+                        ctx.fillStyle = grad;
+
+                        const offsetN = isFloorN ? rimSize : 0;
+
+                        ctx.beginPath();
+                        ctx.moveTo(tx + ts, ty);
+                        ctx.lineTo(tx + ts, ty + ts);
+                        ctx.lineTo(tx + ts - rimSize, ty + ts);
+                        ctx.lineTo(tx + ts - rimSize, ty + offsetN);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+
+                    // Step 5: Special handling for Type 2 (Locked Doors) red X
+                    if (this.map.tiles[y][x] === 2) {
+                        ctx.strokeStyle = '#ff0000';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(tx + 5, ty + 5);
+                        ctx.lineTo(tx + ts - 5, ty + ts - 5);
+                        ctx.moveTo(tx + ts - 5, ty + 5);
+                        ctx.lineTo(tx + 5, ty + ts - 5);
+                        ctx.stroke();
+                        ctx.strokeRect(tx, ty, ts, ts);
+                    }
+                }
+                else {
                     const px = Math.floor(x * this.map.tileSize);
                     const py = Math.floor(y * this.map.tileSize);
 

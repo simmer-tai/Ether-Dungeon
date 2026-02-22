@@ -1,7 +1,7 @@
 import { InputHandler, Camera, Entity } from './utils.js';
 import { Map } from './map.js';
 import { Player } from './player.js';
-import { Enemy, Slime, Bat, Goblin, SkeletonArcher, Chest, Statue, BloodAltar, ShopNPC } from './entities.js';
+import { Enemy, Slime, Bat, Goblin, SkeletonArcher, Chest, Statue, BloodAltar, ShopNPC, WoodCrate, SpikeTrap } from './entities.js';
 import { createSkill } from './skills/index.js';
 import { drawUI, showSkillSelection, hideSkillSelection, showBlessingSelection, hideBlessingSelection, drawDialogue, hideDialogue, initSettingsUI } from './ui.js';
 import { initInventory, renderInventory, resetInventorySelection } from './inventory.js';
@@ -145,6 +145,8 @@ class Game {
         this.map.generate();
         _debugLog("Map Generated");
 
+        this.traps = [];
+
         this.camera = new Camera(this.width / this.zoom, this.height / this.zoom, this.map.pixelWidth, this.map.pixelHeight);
 
         const startRoom = this.map.rooms.find(r => r.type === 'start') || this.map.rooms[0];
@@ -229,6 +231,34 @@ class Game {
                 continue;
             }
 
+            // --- Spawn Wood Crates (50% chance) ---
+            if (room.type !== 'start' && room.type !== 'staircase') {
+                if (Math.random() < 0.5) {
+                    this.spawnCratesInRoom(room);
+                }
+
+                // --- Spawn Spike Traps (30% chance) ---
+                if (Math.random() < 0.3) {
+                    const trapCount = 2 + Math.floor(Math.random() * 3);
+                    for (let i = 0; i < trapCount; i++) {
+                        let attempts = 0;
+                        while (attempts < 20) {
+                            attempts++;
+                            const tx = room.x + 1 + Math.floor(Math.random() * (room.w - 2));
+                            const ty = room.y + 1 + Math.floor(Math.random() * (room.h - 2));
+                            if (this.map.tiles[ty] && this.map.tiles[ty][tx] === 0) {
+                                const trapX = tx * this.map.tileSize;
+                                const trapY = ty * this.map.tileSize;
+                                // In init, we can't check dist to player easily as player might not be fully placed yet
+                                // but we skip start room anyway.
+                                this.traps.push(new SpikeTrap(this, trapX, trapY));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
 
         }
 
@@ -251,7 +281,78 @@ class Game {
         initSettingsUI(this);
     }
 
-    spawnParticles(x, y, count, color) {
+    spawnCratesInRoom(room) {
+        const templates = ['RANDOM', 'CORNERS', 'BORDERS', 'DIVIDER_H', 'DIVIDER_V'];
+        const weights = [0.4, 0.2, 0.2, 0.1, 0.1];
+
+        let r = Math.random();
+        let cumulative = 0;
+        let selectedTemplate = 'RANDOM';
+        for (let i = 0; i < templates.length; i++) {
+            cumulative += weights[i];
+            if (r < cumulative) {
+                selectedTemplate = templates[i];
+                break;
+            }
+        }
+
+        const usedTiles = new Set();
+        const addCrate = (rx, ry) => {
+            const tileKey = `${rx},${ry}`;
+            if (usedTiles.has(tileKey)) return;
+            usedTiles.add(tileKey);
+
+            const crate = new WoodCrate(this, rx * this.map.tileSize, ry * this.map.tileSize);
+            if (!this.map.isWall(crate.x, crate.y)) {
+                this.enemies.push(crate);
+            }
+        };
+
+        const margin = 2;
+        switch (selectedTemplate) {
+            case 'CORNERS':
+                addCrate(room.x + margin, room.y + margin);
+                addCrate(room.x + room.w - 1 - margin, room.y + margin);
+                addCrate(room.x + margin, room.y + room.h - 1 - margin);
+                addCrate(room.x + room.w - 1 - margin, room.y + room.h - 1 - margin);
+                break;
+            case 'BORDERS':
+                // Horizontal lines at offset 2
+                for (let tx = room.x + margin; tx < room.x + room.w - margin; tx++) {
+                    if (Math.random() < 0.7) addCrate(tx, room.y + margin);
+                    if (Math.random() < 0.7) addCrate(tx, room.y + room.h - 1 - margin);
+                }
+                // Vertical lines at offset 2
+                for (let ty = room.y + margin + 1; ty < room.y + room.h - margin - 1; ty++) {
+                    if (Math.random() < 0.7) addCrate(room.x + margin, ty);
+                    if (Math.random() < 0.7) addCrate(room.x + room.w - 1 - margin, ty);
+                }
+                break;
+            case 'DIVIDER_H':
+                const my = room.y + Math.floor(room.h / 2);
+                for (let tx = room.x + margin; tx < room.x + room.w - margin; tx++) {
+                    if (Math.random() < 0.8) addCrate(tx, my);
+                }
+                break;
+            case 'DIVIDER_V':
+                const mx = room.x + Math.floor(room.w / 2);
+                for (let ty = room.y + margin; ty < room.y + room.h - margin; ty++) {
+                    if (Math.random() < 0.8) addCrate(mx, ty);
+                }
+                break;
+            case 'RANDOM':
+            default:
+                const crateCount = Math.floor(Math.random() * 4) + 2;
+                for (let j = 0; j < crateCount; j++) {
+                    const rx = room.x + margin + Math.floor(Math.random() * (room.w - margin * 2));
+                    const ry = room.y + margin + Math.floor(Math.random() * (room.h - margin * 2));
+                    addCrate(rx, ry);
+                }
+                break;
+        }
+    }
+
+    spawnParticles(x, y, count, color, baseVx = 0, baseVy = 0) {
         for (let i = 0; i < count; i++) {
             this.animations.push({
                 type: 'particle',
@@ -260,8 +361,8 @@ class Game {
                 life: 0.3 + Math.random() * 0.2,
                 maxLife: 0.5,
                 color: color,
-                vx: (Math.random() - 0.5) * 200,
-                vy: (Math.random() - 0.5) * 200
+                vx: baseVx + (Math.random() - 0.5) * 200,
+                vy: baseVy + (Math.random() - 0.5) * 200
             });
         }
     }
@@ -585,28 +686,24 @@ class Game {
                     this.map.openRoom(currentRoom);
                     return;
                 }
-                // Calculate enemy count based on room area
-                // Area-based scaling: approx 1 enemy per 25 tiles + random offset. Min 2.
+                // Cost-based spawning: rooms have a budget, enemies have a cost.
                 const area = currentRoom.w * currentRoom.h;
-                const enemyCount = Math.max(2, Math.floor(area / 25) + Math.floor(Math.random() * 3));
-                for (let i = 0; i < enemyCount; i++) {
-                    let enemyToSpawn = null;
-                    const rand = Math.random();
-                    let ew = 32, eh = 32; // Default dimensions (Slime)
+                let budget = Math.max(8, Math.floor(area / 15) + Math.floor(Math.random() * 5));
 
-                    if (rand < 0.4) {
-                        enemyToSpawn = 'slime';
-                        ew = 32; eh = 32;
-                    } else if (rand < 0.6) {
-                        enemyToSpawn = 'goblin';
-                        ew = 64; eh = 64;
-                    } else if (rand < 0.8) {
-                        enemyToSpawn = 'bat';
-                        ew = 24; eh = 24;
-                    } else {
-                        enemyToSpawn = 'skeleton';
-                        ew = 40; eh = 48;
-                    }
+                const monsterTypes = [
+                    { type: 'bat', cost: 1, ew: 24, eh: 24, Class: Bat },
+                    { type: 'slime', cost: 2, ew: 32, eh: 32, Class: Slime },
+                    { type: 'goblin', cost: 4, ew: 64, eh: 64, Class: Goblin },
+                    { type: 'skeleton', cost: 3, ew: 40, eh: 48, Class: SkeletonArcher }
+                ];
+
+                while (budget > 0) {
+                    // Filter monster types affordable within current budget
+                    const affordable = monsterTypes.filter(m => m.cost <= budget);
+                    if (affordable.length === 0) break;
+
+                    const monster = affordable[Math.floor(Math.random() * affordable.length)];
+                    budget -= monster.cost;
 
                     let ex, ey;
                     let validSpawn = false;
@@ -621,14 +718,14 @@ class Game {
 
                         if (this.map.tiles[ty][tx] === 0) {
                             // Center enemy on tile
-                            ex = (tx + 0.5) * this.map.tileSize - ew / 2;
-                            ey = (ty + 0.5) * this.map.tileSize - eh / 2;
+                            ex = (tx + 0.5) * this.map.tileSize - monster.ew / 2;
+                            ey = (ty + 0.5) * this.map.tileSize - monster.eh / 2;
 
                             // Check all 4 corners for wall collision
                             const hitsWall = this.map.isWall(ex, ey) ||
-                                this.map.isWall(ex + ew, ey) ||
-                                this.map.isWall(ex, ey + eh) ||
-                                this.map.isWall(ex + ew, ey + eh);
+                                this.map.isWall(ex + monster.ew, ey) ||
+                                this.map.isWall(ex, ey + monster.eh) ||
+                                this.map.isWall(ex + monster.ew, ey + monster.eh);
 
                             if (!hitsWall) {
                                 validSpawn = true;
@@ -636,16 +733,8 @@ class Game {
                         }
                     }
 
-                    if (!validSpawn) continue;
-
-                    if (enemyToSpawn === 'slime') {
-                        this.enemies.push(new Slime(this, ex, ey));
-                    } else if (enemyToSpawn === 'goblin') {
-                        this.enemies.push(new Goblin(this, ex, ey));
-                    } else if (enemyToSpawn === 'bat') {
-                        this.enemies.push(new Bat(this, ex, ey));
-                    } else {
-                        this.enemies.push(new SkeletonArcher(this, ex, ey));
+                    if (validSpawn) {
+                        this.enemies.push(new monster.Class(this, ex, ey));
                     }
                 }
 
@@ -659,6 +748,7 @@ class Game {
             if (currentRoom.active) {
                 // Count enemies inside this room
                 const enemiesInRoom = this.enemies.filter(e =>
+                    !e.isPassive &&
                     e.x >= currentRoom.x * this.map.tileSize &&
                     e.x < (currentRoom.x + currentRoom.w) * this.map.tileSize &&
                     e.y >= currentRoom.y * this.map.tileSize &&
@@ -680,6 +770,9 @@ class Game {
                 }
             }
         }
+
+        // --- Update Traps ---
+        this.traps.forEach(trap => trap.update(dt));
 
         // Staircase Interaction
         if (currentRoom && currentRoom.type === 'staircase') {
@@ -1163,6 +1256,13 @@ class Game {
             if (p.layer === 'bottom' && p.active !== false) {
                 if (!this.camera.isVisible(p.x, p.y, p.w || 10, p.h || 10)) return;
                 this.drawProjectile(p);
+            }
+        });
+
+        // Draw Traps (Floor layer)
+        this.traps.forEach(trap => {
+            if (this.camera.isVisible(trap.x, trap.y, trap.width, trap.height)) {
+                trap.draw(this.ctx);
             }
         });
 

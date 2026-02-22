@@ -1302,5 +1302,167 @@ export const projectileBehaviors = {
                 this.life = 0;
             };
         }
+    },
+    'magma_spear': (user, game, params) => {
+        let vx = 0, vy = 0;
+        let speed = params.speed || 400;
+        let rotation = 0;
+
+        // Directional logic
+        if (user.facing === 'left') { vx = -speed; rotation = Math.PI; }
+        else if (user.facing === 'right') { vx = speed; rotation = 0; }
+        else if (user.facing === 'up') { vy = -speed; rotation = -Math.PI / 2; }
+        else if (user.facing === 'down') { vy = speed; rotation = Math.PI / 2; }
+        else if (user.facing === 'up-left') { vx = -speed * 0.707; vy = -speed * 0.707; rotation = -3 * Math.PI / 4; }
+        else if (user.facing === 'up-right') { vx = speed * 0.707; vy = -speed * 0.707; rotation = -Math.PI / 4; }
+        else if (user.facing === 'down-left') { vx = -speed * 0.707; vy = speed * 0.707; rotation = 3 * Math.PI / 4; }
+        else if (user.facing === 'down-right') { vx = speed * 0.707; vy = speed * 0.707; rotation = Math.PI / 4; }
+
+        if (user.isAetherRush) {
+            speed *= 1.5;
+            vx *= 1.5;
+            vy *= 1.5;
+        }
+
+        const spawnX = user.x + user.width / 2;
+        const spawnY = user.y + user.height / 2;
+
+        const proj = spawnProjectile(game, spawnX, spawnY, vx, vy, {
+            ...params,
+            rotation: rotation,
+            fixedOrientation: true,
+            pierce: 999 // Always pierce
+        });
+
+        if (proj) {
+            proj.puddleTimer = 0;
+            const originalUpdate = proj.update;
+            proj.update = function (dt) {
+                // Spawn Puddles
+                this.puddleTimer += dt;
+                const interval = user.isAetherRush ? params.puddleInterval * 0.5 : params.puddleInterval;
+                if (this.puddleTimer >= interval) {
+                    this.puddleTimer = 0;
+
+                    const puddleLife = user.isAetherRush ? params.puddleLife * 1.5 : params.puddleLife;
+                    const puddleScale = user.isAetherRush ? 1.5 : 1.0;
+
+                    game.animations.push({
+                        type: 'magma_puddle',
+                        layer: 'bottom', // Render below entities
+                        x: this.x + this.w / 2,
+                        y: this.y + this.h / 2,
+                        radius: 24 * puddleScale,
+                        life: puddleLife,
+                        maxLife: puddleLife,
+                        damage: params.puddleDamage || 5,
+                        slow: params.slowMultiplier || 0.5,
+                        hitEnemies: new Map(), // Enemy -> TimeToNextTick
+                        update: function (dt2) {
+                            this.life -= dt2;
+                            // Check collisions
+                            game.enemies.forEach(e => {
+                                const dx = (e.x + e.width / 2) - this.x;
+                                const dy = (e.y + e.height / 2) - this.y;
+                                if (Math.hypot(dx, dy) < this.radius) {
+                                    // Apply Slow
+                                    e.tempSlow = 0.2;
+                                    e.slowMultiplier = this.slow;
+
+                                    let tickTimer = this.hitEnemies.get(e) || 0;
+                                    tickTimer -= dt2;
+
+                                    if (tickTimer <= 0) {
+                                        e.takeDamage(this.damage, '#ff4400', 0);
+                                        this.hitEnemies.set(e, 0.5); // 0.5s interval
+                                        game.spawnParticles(e.x + e.width / 2, e.y + e.height / 2, 2, '#ff4400', -this.vx * 0.2, -this.vy * 0.2);
+                                    } else {
+                                        this.hitEnemies.set(e, tickTimer);
+                                    }
+                                }
+                            });
+                        },
+                        draw: function (ctx) {
+                            ctx.save();
+                            ctx.globalAlpha = Math.min(1, this.life / 0.5) * 0.6;
+                            ctx.fillStyle = '#ff4400';
+                            ctx.beginPath();
+                            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                            ctx.fill();
+                            // Inner glow
+                            ctx.fillStyle = '#ffbb00';
+                            ctx.beginPath();
+                            ctx.arc(this.x, this.y, this.radius * 0.6, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.restore();
+                        }
+                    });
+                }
+
+                // Wall Check
+                if (game.map.isWall(this.x + this.w / 2, this.y + this.h / 2)) {
+                    this.life = 0;
+                }
+
+                // Call basic movement/life update
+                if (originalUpdate) originalUpdate.call(this, dt);
+            };
+        }
+    },
+    'aqua_shot': (user, game, params) => {
+        let vx = 0, vy = 0;
+        let speed = params.speed || 500;
+        let rotation = 0;
+
+        // Directional logic
+        if (user.facing === 'left') { vx = -speed; rotation = Math.PI; }
+        else if (user.facing === 'right') { vx = speed; rotation = 0; }
+        else if (user.facing === 'up') { vy = -speed; rotation = -Math.PI / 2; }
+        else if (user.facing === 'bottom' || user.facing === 'down') { vy = speed; rotation = Math.PI / 2; }
+        else if (user.facing === 'up-left') { vx = -speed * 0.707; vy = -speed * 0.707; rotation = -3 * Math.PI / 4; }
+        else if (user.facing === 'up-right') { vx = speed * 0.707; vy = -speed * 0.707; rotation = -Math.PI / 4; }
+        else if (user.facing === 'down-left') { vx = -speed * 0.707; vy = speed * 0.707; rotation = 3 * Math.PI / 4; }
+        else if (user.facing === 'down-right') { vx = speed * 0.707; vy = speed * 0.707; rotation = Math.PI / 4; }
+
+        const spawnX = user.x + user.width / 2;
+        const spawnY = user.y + user.height / 2;
+
+        spawnProjectile(game, spawnX, spawnY, vx, vy, {
+            ...params,
+            rotation: rotation,
+            fixedOrientation: true,
+            onHitEnemy: function (enemy, g) {
+                // Apply Damage and Status (Standard)
+                enemy.takeDamage(this.damage, this.damageColor, this.aetherCharge);
+                if (enemy.statusManager) {
+                    enemy.statusManager.applyStatus(params.statusEffect, 5.0);
+                }
+
+                // Custom Splash Effect
+                for (let i = 0; i < 8; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const s = 50 + Math.random() * 100;
+                    g.animations.push({
+                        type: 'particle',
+                        x: enemy.x + enemy.width / 2,
+                        y: enemy.y + enemy.height / 2,
+                        w: 4 + Math.random() * 6,
+                        h: 4 + Math.random() * 6,
+                        life: 0.3 + Math.random() * 0.2,
+                        maxLife: 0.5,
+                        color: '#aae6ff', // Light Water Blue
+                        vx: Math.cos(angle) * s,
+                        vy: Math.sin(angle) * s,
+                        update: function (dt) {
+                            this.life -= dt;
+                            this.x += this.vx * dt;
+                            this.y += this.vy * dt;
+                            this.vy += 200 * dt; // Gravity
+                        }
+                    });
+                }
+                this.life = 0; // Destroy on hit
+            }
+        });
     }
 };

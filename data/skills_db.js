@@ -10,10 +10,10 @@ export const skillsDB = [
         params: {
             count: 6, // Number of pellets
             angleSpread: 45, // Spread in degrees
-            damage: 3,
+            damage: 4,
             speed: 600,
             randomSpeed: 150, // Variation in speed
-            life: 0.233, // Short range (140px range)
+            life: 0.3, // Short range (increased from 0.233)
             width: 14,
             height: 14,
             // shape: 'orb', // REMOVE procedural shape
@@ -29,7 +29,8 @@ export const skillsDB = [
             statusChance: 0.2,
             aetherCharge: 2.7, // Calculated: 5.0 / (1.5 hits / 0.8s)
             critChance: 0.08,      // 8% - 連射型なのでクリ率は低め
-            critMultiplier: 2.0
+            critMultiplier: 2.0,
+            noShake: true // Bypass universal hit shake in main.js
         }
     },
     {
@@ -91,7 +92,7 @@ export const skillsDB = [
         name: 'アイスシグナル', // Ice Signal
         type: 'normal',
         icon: 'assets/icon_ice.png', // Placeholder
-        cooldown: 0.035, // 0.05 * 0.7
+        cooldown: 0.045, // Increased from 0.035
         behavior: 'projectile',
         description: '目の前に氷の針を一瞬だけ出現させる超高速の突き攻撃。',
         params: {
@@ -153,7 +154,7 @@ export const skillsDB = [
         behavior: 'projectile',
         description: '前方に火の玉を発射する。射程が長く、威力も高い。',
         params: {
-            damage: 40,
+            damage: 20,
             speed: 550,
             width: 64, // 32 * 2
             height: 32, // 16 * 2
@@ -171,9 +172,9 @@ export const skillsDB = [
             frameRate: 0.05, // 0.1 / 2 (2x Speed)
             // Charge Params
             chargeable: true,
-            chargeTime: 1.0,
-            minDamage: 20, // Uncharged
-            maxDamage: 80, // Fully Charged (4x)
+            chargeTime: 0.5,
+            minDamage: 10, // Uncharged
+            maxDamage: 50, // Fully Charged
             minSize: 48, // Uncharged (Small)
             maxSize: 128, // Fully Charged (Large) (64*2)
             maxSpeed: 700,
@@ -444,16 +445,16 @@ export const skillsDB = [
         icon: 'assets/icon_thunder_god.png', // Placeholder
         cooldown: 15.0,
         behavior: 'global_strike',
-        description: '画面内の全ての敵に、神の如き雷槌を落とす。',
+        description: '上下左右の4方向に、3連続の雷槌を落とす。',
         params: {
             damage: 20, // High single hit
-            count: 5, // Total bolts to drop
+            count: 3, // Waves per direction
             damageColor: '#ffff00', // Yellow
             aetherCharge: 0, // Ultimate (No gain)
             critChance: 0.30,      // 30% - 神の雷は高クリ率
             critMultiplier: 3.0    // 高倍率
         },
-        aetherRushDesc: '画面内の全ての敵に対してボルトを落とす（通常は3体にランダム、各2ボルト）。'
+        aetherRushDesc: '上下左右に加え、斜め方向を含む8方向に雷槌を落とす。'
     },
     {
         id: 'glacial_lotus',
@@ -466,12 +467,12 @@ export const skillsDB = [
         params: {
             damage: 15, // Reduced for balance with pierce/scatter
             petalCount: 16, // Number of petals
-            bloomRadius: 60,
-            bloomDuration: 0.8, // Time until burst
+            bloomRadius: 45,
+            bloomDuration: 0, // Time until burst
             burstSpeed: 900,
             burstLife: 1.2,
-            width: 24,
-            height: 60,
+            width: 18,
+            height: 45,
             spriteSheet: 'assets/ice_spike.png',
             damageColor: '#00ffff', // Cyan (Ice)
             fixedOrientation: true,
@@ -508,5 +509,73 @@ export const skillsDB = [
             critMultiplier: 3.0    // 血に染まる高倍率
         },
         aetherRushDesc: '画面内の全敵を対象に発動し、ダメージが2倍になる。'
+    },
+    {
+        id: 'phoenix_dive',
+        name: 'フェニックス・ダイブ', // Phoenix Dive
+        type: 'primary',
+        icon: 'assets/icon_phoenix_dive.png',
+        cooldown: 8.0,
+        behavior: 'phoenix_dive',
+        description: '炎の鳥となって突撃する。このスキルで敵を倒すとクールダウンが即座に解消される。',
+        params: {
+            speed: 1200,
+            duration: 0.4,
+            damage: 15,
+            aetherCharge: 2.0,
+            spriteSheet: 'assets/phoenix_aura.png',
+            spriteData: 'assets/phoenix_aura.json',
+            frames: 4
+        },
+        aetherRushDesc: '突撃速度と威力が大幅に上昇し、移動距離も延長される。'
+    },
+    {
+        id: 'magma_spear',
+        name: 'マグマ・スピア', // Magma Spear
+        type: 'primary',
+        icon: 'assets/icon_magma_spear.png',
+        cooldown: 6.0,
+        behavior: 'magma_spear',
+        description: '貫通するマグマの槍を放つ。通過した地面には継続ダメージと鈍足効果を与えるマグマ溜まりが残る。',
+        params: {
+            damage: 20,
+            speed: 400,
+            life: 2.0,
+            puddleDamage: 5,
+            puddleLife: 3.0,
+            puddleInterval: 0.1,
+            slowMultiplier: 0.5,
+            width: 48,
+            height: 16,
+            spriteSheet: 'assets/magma_spear.png',
+            color: '#ff4400',
+            trailColor: '#ffbb00',
+            aetherCharge: 2.0
+        },
+        aetherRushDesc: '槍が巨大化し、マグマ溜まりの範囲と持続時間が大幅に強化される。'
+    },
+    {
+        id: 'aqua_shot',
+        name: 'アクア・ショット', // Aqua Shot
+        type: 'normal',
+        icon: 'assets/icon_aqua_shot.png',
+        cooldown: 0.5,
+        behavior: 'aqua_shot',
+        description: '貫通する水の弾丸を放ち、敵を「濡れ」状態にする。「燃焼」状態の敵に当てると火を消すことができる。',
+        params: {
+            damage: 8,
+            speed: 500,
+            life: 0.8,
+            width: 16,
+            height: 16,
+            spriteSheet: 'assets/aqua_shot.png',
+            color: '#00aaff',
+            trailColor: 'rgba(0, 170, 255, 0.4)',
+            damageColor: '#00aaff',
+            statusEffect: 'wet',
+            statusChance: 1.0,
+            aetherCharge: 2.0,
+            pierce: 0 // Normal projectile (stops on hit usually, but check pierce logic)
+        }
     }
 ];

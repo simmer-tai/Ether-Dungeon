@@ -8,3 +8,5 @@ export { Statue } from './entities/Statue.js';
 export { DropItem } from './entities/DropItem.js';
 export { BloodAltar } from './entities/BloodAltar.js';
 export { ShopNPC } from './entities/ShopNPC.js';
+export { WoodCrate } from './entities/WoodCrate.js';
+export { SpikeTrap } from './entities/SpikeTrap.js';

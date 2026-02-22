@@ -370,6 +370,19 @@ export class RoomConnector {
                         this.map.tiles[node.y + 1][node.x + 1] = 0;
                     }
                 }
+
+                // Re-open the connector entrance (direction-aware) to guarantee 2-tile width
+                // The fill2x2 above may not align for W/N-facing connectors
+                this.map.tiles[connector.y][connector.x] = 0;
+                if (connector.dir.x === 0) {
+                    // N/S: 2nd tile is at x+1
+                    if (this.map.isValid(connector.x + 1, connector.y))
+                        this.map.tiles[connector.y][connector.x + 1] = 0;
+                } else {
+                    // E/W: 2nd tile is at y+1
+                    if (this.map.isValid(connector.x, connector.y + 1))
+                        this.map.tiles[connector.y + 1][connector.x] = 0;
+                }
             }
         }
     }

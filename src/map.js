@@ -64,6 +64,7 @@ export class Map {
             startRoom.connectors.push({ x: centerX, y: centerY + 3, dir: { x: -1, y: 0 }, used: false });
             startRoom.connectors.push({ x: centerX + 7, y: centerY + 3, dir: { x: 1, y: 0 }, used: false });
             this.rooms.push(startRoom);
+            this.placeStartNeighborRooms(startRoom); // Guarantee 4-way corridors + rooms
 
             // 1. Critical Rooms - Staircase
             let staircasePlaced = this.placer.placeRoom({ w: 6, h: 6, type: 'staircase', entranceCount: 1 });
@@ -126,6 +127,104 @@ export class Map {
         }
     }
 
+    placeStartNeighborRooms(startRoom) {
+        const corridorLen = 10;
+
+        for (let c of startRoom.connectors) {
+            const dx = c.dir.x;
+            const dy = c.dir.y;
+            const roomW = Math.floor(Math.random() * 5) + 10; // 10–14
+            const roomH = Math.floor(Math.random() * 5) + 10;
+
+            // Corridor end tile (10 steps from connector in its direction)
+            const corridorEndX = c.x + dx * corridorLen;
+            const corridorEndY = c.y + dy * corridorLen;
+            // New room's wall tile is one step beyond the corridor end
+            const wallX = corridorEndX + dx;
+            const wallY = corridorEndY + dy;
+
+            // Position the new room so its facing wall aligns with the corridor
+            let roomX, roomY;
+            if (dy < 0) {        // North — south wall of new room at wallY
+                roomY = wallY - roomH + 1;
+                roomX = c.x - 3;
+            } else if (dy > 0) { // South — north wall of new room at wallY
+                roomY = wallY;
+                roomX = c.x - 3;
+            } else if (dx < 0) { // West  — east wall of new room at wallX
+                roomX = wallX - roomW + 1;
+                roomY = c.y - 3;
+            } else {             // East  — west wall of new room at wallX
+                roomX = wallX;
+                roomY = c.y - 3;
+            }
+
+            // Map bounds check
+            if (roomX < 2 || roomY < 2 ||
+                roomX + roomW >= this.width - 2 ||
+                roomY + roomH >= this.height - 2) continue;
+
+            // Overlap check against existing rooms (4-tile buffer)
+            let canPlace = true;
+            for (let other of this.rooms) {
+                if (roomX < other.x + other.w + 4 && roomX + roomW + 4 > other.x &&
+                    roomY < other.y + other.h + 4 && roomY + roomH + 4 > other.y) {
+                    canPlace = false; break;
+                }
+            }
+            if (!canPlace) continue;
+
+            // Carve the room
+            const newRoom = {
+                x: roomX, y: roomY, w: roomW, h: roomH,
+                type: 'normal', connectors: [], id: this.rooms.length, shape: 'square'
+            };
+            this.placer.carveRoom(newRoom);
+
+            // Add one connector per side (all 4 directions) for these key rooms
+            const cx2 = roomX + Math.floor(roomW / 2) - 1; // Center column (x)
+            const cy2 = roomY + Math.floor(roomH / 2) - 1; // Center row (y)
+            newRoom.connectors.push({ x: cx2, y: roomY, dir: { x: 0, y: -1 }, used: false }); // N
+            newRoom.connectors.push({ x: cx2, y: roomY + roomH - 1, dir: { x: 0, y: 1 }, used: false }); // S
+            newRoom.connectors.push({ x: roomX, y: cy2, dir: { x: -1, y: 0 }, used: false }); // W
+            newRoom.connectors.push({ x: roomX + roomW - 1, y: cy2, dir: { x: 1, y: 0 }, used: false }); // E
+
+            this.rooms.push(newRoom);
+
+            // Open start room connector wall
+            this.tiles[c.y][c.x] = 0;
+            if (dx === 0) { if (this.isValid(c.x + 1, c.y)) this.tiles[c.y][c.x + 1] = 0; }
+            else { if (this.isValid(c.x, c.y + 1)) this.tiles[c.y + 1][c.x] = 0; }
+
+            // Carve 10 corridor tiles (direction-aware 2-wide)
+            let lx = c.x, ly = c.y;
+            for (let i = 0; i < corridorLen; i++) {
+                lx += dx; ly += dy;
+                this.tiles[ly][lx] = 0;
+                if (dx === 0) { if (this.isValid(lx + 1, ly)) this.tiles[ly][lx + 1] = 0; }
+                else { if (this.isValid(lx, ly + 1)) this.tiles[ly + 1][lx] = 0; }
+            }
+
+            // Open new room entrance wall
+            this.tiles[wallY][wallX] = 0;
+            if (dx === 0) { if (this.isValid(wallX + 1, wallY)) this.tiles[wallY][wallX + 1] = 0; }
+            else { if (this.isValid(wallX, wallY + 1)) this.tiles[wallY + 1][wallX] = 0; }
+
+            // Mark start connector as used
+            c.used = true;
+
+            // Mark the matching back-connector in the new room as used
+            const backConn = newRoom.connectors.find(nc => nc.x === wallX && nc.y === wallY);
+            if (backConn) {
+                backConn.used = true;
+            } else {
+                newRoom.connectors.push({
+                    x: wallX, y: wallY, dir: { x: -dx, y: -dy }, used: true
+                });
+            }
+        }
+    }
+
     generateTraining() {
         this.width = 40;
         this.height = 40;
@@ -180,39 +279,41 @@ export class Map {
 
     closeRoom(room) {
         if (!room) return;
-        for (let c of room.connectors) {
-            if (!c.used) continue; // Only block corridors that are actually connected
-            // For N/S connectors (dir.x===0): block (x,y) and (x+1,y) — horizontal pair
-            // For E/W connectors (dir.x!==0): block (x,y) and (x,y+1) — vertical pair
-            this.tiles[c.y][c.x] = 2; // Locked door
-
-            if (c.dir.x === 0) {
-                // Corridor flows north/south → entrance is side-by-side horizontally
-                if (this.isValid(c.x + 1, c.y)) this.tiles[c.y][c.x + 1] = 2;
-            } else {
-                // Corridor flows east/west → entrance is stacked vertically
-                if (this.isValid(c.x, c.y + 1)) this.tiles[c.y + 1][c.x] = 2;
-            }
+        // Scan all 4 boundary edges for open tiles and seal them.
+        // This detects ALL openings regardless of how they were created
+        // (connectors, forceConnectivity, forceConnectConnector, etc.).
+        const rx = room.x, ry = room.y, rw = room.w, rh = room.h;
+        const sealTile = (x, y) => {
+            if (this.isValid(x, y) && this.tiles[y][x] === 0) this.tiles[y][x] = 2;
+        };
+        // Top and bottom rows
+        for (let x = rx; x < rx + rw; x++) {
+            sealTile(x, ry);
+            sealTile(x, ry + rh - 1);
+        }
+        // Left and right columns (excluding corners already covered)
+        for (let y = ry + 1; y < ry + rh - 1; y++) {
+            sealTile(rx, y);
+            sealTile(rx + rw - 1, y);
         }
     }
 
     openRoom(room) {
         if (!room) return;
-        for (let c of room.connectors) {
-            if (!c.used) continue; // Only restore tiles that were actually locked
-            // Restore only the tiles that were locked by closeRoom
-            if (this.isValid(c.x, c.y) && this.tiles[c.y][c.x] === 2) {
-                this.tiles[c.y][c.x] = 0;
-            }
-            if (c.dir.x === 0) {
-                if (this.isValid(c.x + 1, c.y) && this.tiles[c.y][c.x + 1] === 2) {
-                    this.tiles[c.y][c.x + 1] = 0;
-                }
-            } else {
-                if (this.isValid(c.x, c.y + 1) && this.tiles[c.y + 1][c.x] === 2) {
-                    this.tiles[c.y + 1][c.x] = 0;
-                }
-            }
+        // Reverse of closeRoom: restore any locked tile on the boundary back to floor.
+        const rx = room.x, ry = room.y, rw = room.w, rh = room.h;
+        const openTile = (x, y) => {
+            if (this.isValid(x, y) && this.tiles[y][x] === 2) this.tiles[y][x] = 0;
+        };
+        // Top and bottom rows
+        for (let x = rx; x < rx + rw; x++) {
+            openTile(x, ry);
+            openTile(x, ry + rh - 1);
+        }
+        // Left and right columns (excluding corners already covered)
+        for (let y = ry + 1; y < ry + rh - 1; y++) {
+            openTile(rx, y);
+            openTile(rx + rw - 1, y);
         }
     }
 

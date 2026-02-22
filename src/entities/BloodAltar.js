@@ -3,7 +3,7 @@ import { Entity, getCachedImage } from '../utils.js';
 export class BloodAltar extends Entity {
     constructor(game, x, y) {
         // Large statue-like presence (120x120)
-        super(game, x - 40, y - 40, 120, 120, '#ff0000', 1);
+        super(game, x - 60, y - 60, 120, 120, '#ff0000', 1);
         this.used = false;
         this.image = getCachedImage('assets/blood_altar.png');
         this.showPrompt = false;

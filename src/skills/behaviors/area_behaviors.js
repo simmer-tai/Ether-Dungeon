@@ -943,110 +943,306 @@ export const areaBehaviors = {
     },
 
     'global_strike': (user, game, params) => {
-        // 2. Heavy Screen Shake
-        const initialShakePower = user.isAetherRush ? 6 : 10;
-        const initialShakeDuration = user.isAetherRush ? 0.3 : 0.5;
+        // 1. Initial Blast at user location
+        const initialShakePower = 8;
+        const initialShakeDuration = 0.4;
         game.camera.shake(initialShakeDuration, initialShakePower);
 
-        // 3. Target List
-        const targets = game.enemies.filter(e => !e.markedForDeletion);
-
-        // Handle empty targets (Visual Fallback)
-        if (targets.length === 0) {
-            const isRush = user.isAetherRush;
-            const randomCount = isRush ? 20 : 5;
-            for (let i = 0; i < randomCount; i++) {
-                const tx = user.x + (Math.random() - 0.5) * 600;
-                const ty = user.y + (Math.random() - 0.5) * 400;
-                spawnLightningBolt(game, tx, ty, {
-                    height: 800, segments: 40, deviation: 60, thickness: 40, color: '#ffff00'
-                });
-                spawnThunderfallImpact(game, tx, ty, 1.5);
-            }
-            return;
+        // 2. Determine Directions
+        const isRush = user.isAetherRush;
+        const angles = [];
+        if (isRush) {
+            // 8 directions
+            for (let i = 0; i < 8; i++) angles.push((i * Math.PI) / 4);
+        } else {
+            // 4 directions (Cardinal)
+            for (let i = 0; i < 4; i++) angles.push((i * Math.PI) / 2);
         }
 
-        // Determine Hit Count and Bolts per Hit
-        const isRush = user.isAetherRush;
-        const baseCount = params.count || 5;
-        const hitCount = isRush ? 10 : baseCount; // 10 waves in rush
-        const boltsPerHit = isRush ? 2 : 1; // 2 bolts per wave in rush
-
-        const interval = 0.05;
+        // 3. Create Strike Queue (3 waves of increasing distance)
         const strikeQueue = [];
-        let totalDelay = 0;
+        const waveCount = params.count || 3;
+        const waveSpacing = 80;
+        const waveInterval = 0.12;
 
-        for (let i = 0; i < hitCount; i++) {
-            for (let j = 0; j < boltsPerHit; j++) {
-                // Pick rand enemy
-                const targetIndex = Math.floor(Math.random() * targets.length);
-                const target = targets[targetIndex];
+        for (let w = 0; w < waveCount; w++) {
+            const dist = (w + 1) * waveSpacing;
+            const delay = w * waveInterval;
 
-                // Offset
-                const offset = 40; // Random area around target
+            angles.forEach(angle => {
+                const tx = user.x + Math.cos(angle) * dist;
+                const ty = user.y + Math.sin(angle) * dist;
 
                 strikeQueue.push({
-                    target: target,
-                    offset: offset,
-                    delay: totalDelay
+                    x: tx,
+                    y: ty,
+                    delay: delay
                 });
-            }
-
-            totalDelay += interval + Math.random() * 0.01;
+            });
         }
 
-        // Spawn logic entity to handle the queue
+        // 4. Spawn Logic Entity to process queue
         game.animations.push({
             type: 'logic',
-            life: totalDelay + 0.5, // Ensure it lives long enough
+            life: (waveCount * waveInterval) + 0.5,
             timer: 0,
             queue: strikeQueue,
             update: function (dt) {
                 this.timer += dt;
 
-                // Process queue
-                // We iterate backwards to allow splicing or just check all (efficiency isn't huge concern for <50 items)
-                // Better: keep an index? Or just filter?
-                // Simple: check first item, if ready, fire and shift. Loop in case multiple frame skips.
-
                 while (this.queue.length > 0 && this.queue[0].delay <= this.timer) {
                     const strike = this.queue.shift();
-                    const e = strike.target;
+                    const sx = strike.x;
+                    const sy = strike.y;
 
-                    if (!e.markedForDeletion) {
-                        const ex = e.x + e.width / 2 + (Math.random() - 0.5) * strike.offset;
-                        const ey = e.y + e.height / 2 + (Math.random() - 0.5) * strike.offset;
+                    // Damage all enemies in radius
+                    const radius = 60;
+                    game.enemies.forEach(e => {
+                        if (!e.markedForDeletion) {
+                            const dx = e.x + e.width / 2 - sx;
+                            const dy = e.y + e.height / 2 - sy;
+                            if (Math.hypot(dx, dy) < radius) {
+                                e.takeDamage(params.damage || 20, params.damageColor || '#ffff00', params.aetherCharge);
+                            }
+                        }
+                    });
 
-                        // Damage
-                        e.takeDamage(params.damage || 50, params.damageColor || '#ffff00', params.aetherCharge);
+                    // Visuals
+                    spawnLightningBolt(game, sx, sy, {
+                        height: 800, segments: 30, deviation: 50, thickness: 50, color: '#ffff00', life: 0.1
+                    });
+                    spawnThunderfallImpact(game, sx, sy, 1.8);
 
-                        // Visuals: Massive Bolt
-                        spawnLightningBolt(game, ex, ey, {
-                            height: 800,
-                            segments: 40,
-                            deviation: 60,
-                            thickness: 40,
-                            color: '#ffff00',
-                            life: 0.08 // Faster fade (User requested)
-                        });
-
-                        // Visuals: Massive Impact
-                        spawnThunderfallImpact(game, ex, ey, 1.5);
-
-                        // Camera Shake PER BOLT
-                        const boltShakePower = user.isAetherRush ? 2 : 5;
-                        const boltShakeDuration = user.isAetherRush ? 0.1 : 0.2;
-                        game.camera.shake(boltShakeDuration, boltShakePower);
-                    }
+                    // Camera Shake
+                    game.camera.shake(0.12, isRush ? 3 : 5);
                 }
 
-                // Done?
-                if (this.queue.length === 0) {
-                    this.life = 0;
+                if (this.queue.length === 0) this.life = 0;
+            }
+        });
+    },
+
+    'phoenix_dive': function (user, game, params) {
+        // Aether Rush Modifiers
+        let speed = params.speed || 1200;
+        let duration = params.duration || 0.4;
+        let damage = params.damage || 15;
+        const skillInstance = this;
+
+        if (user.isAetherRush) {
+            speed *= 1.3;
+            duration *= 1.2;
+            damage *= 1.5;
+        }
+
+        let dx = 0, dy = 0;
+        if (user.facing === 'left') dx = -1;
+        else if (user.facing === 'right') dx = 1;
+        else if (user.facing === 'up') dy = -1;
+        else if (user.facing === 'down') dy = 1;
+        else if (user.facing === 'up-left') { dx = -0.707; dy = -0.707; }
+        else if (user.facing === 'up-right') { dx = 0.707; dy = -0.707; }
+        else if (user.facing === 'down-left') { dx = -0.707; dy = 0.707; }
+        else if (user.facing === 'down-right') { dx = 0.707; dy = 0.707; }
+
+        if (dx === 0 && dy === 0) dy = 1;
+
+        user.isCasting = true;
+        user.invulnerable = duration + 0.1;
+
+        let killCount = 0;
+
+        // JSON Data Logic
+        if (params.spriteData && !params._loadedFrames) {
+            if (!window.spriteDataCache) window.spriteDataCache = {};
+            if (window.spriteDataCache[params.spriteData]) {
+                params._loadedFrames = window.spriteDataCache[params.spriteData];
+            } else {
+                params._loadedFrames = [];
+                fetch(params.spriteData)
+                    .then(r => r.json())
+                    .then(data => {
+                        const keys = Object.keys(data.frames).sort();
+                        const frames = keys.map(k => data.frames[k].frame);
+                        params._loadedFrames.push(...frames);
+                        window.spriteDataCache[params.spriteData] = params._loadedFrames;
+                    })
+                    .catch(e => console.error("Failed to load sprite data", e));
+            }
+        }
+
+        // Visual Aura
+        const aura = {
+            type: 'animation',
+            x: user.x, y: user.y,
+            w: 120, h: 120,
+            life: duration,
+            maxLife: duration,
+            image: params.spriteSheet ? getCachedImage(params.spriteSheet) : null,
+            frames: params.frames || 1,
+            frameX: 0, frameTimer: 0, frameRate: 0.05,
+            rotation: Math.atan2(dy, dx),
+            update: function (dt) {
+                this.life -= dt;
+                this.x = user.x + user.width / 2 - this.w / 2;
+                this.y = user.y + user.height / 2 - this.h / 2;
+
+                // Sync frame to player direction if there are multiple frames (Right=0, Left=1, Up=2, Down=3)
+                const frameCount = (params._loadedFrames && params._loadedFrames.length > 0) ? params._loadedFrames.length : this.frames;
+                if (frameCount >= 4) {
+                    if (user.facing.includes('right')) this.frameX = 0;
+                    else if (user.facing.includes('left')) this.frameX = 1;
+                    else if (user.facing.includes('up')) this.frameX = 2;
+                    else if (user.facing.includes('down')) this.frameX = 3;
+                } else if (frameCount > 1) {
+                    // Traditional time-based animation for non-directional sheets
+                    this.frameTimer += dt;
+                    if (this.frameTimer >= this.frameRate) {
+                        this.frameTimer = 0;
+                        this.frameX = (this.frameX + 1) % frameCount;
+                    }
+                }
+            },
+            draw: function (ctx) {
+                if (this.image && this.image.complete) {
+                    ctx.save();
+                    ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+
+                    const frameCount = (params._loadedFrames && params._loadedFrames.length > 0) ? params._loadedFrames.length : this.frames;
+                    // Only rotate if NOT using directional frames
+                    if (frameCount < 4) {
+                        ctx.rotate(this.rotation);
+                    }
+
+                    // Flip vertically only for Down direction (Frame 3)
+                    if (frameCount >= 4 && this.frameX === 3) {
+                        ctx.scale(1, -1);
+                    }
+
+                    ctx.globalAlpha = 0.6;
+
+                    const frameData = (params._loadedFrames && params._loadedFrames.length > this.frameX) ? params._loadedFrames[this.frameX] : null;
+
+                    if (frameData) {
+                        ctx.drawImage(
+                            this.image,
+                            frameData.x, frameData.y, frameData.w, frameData.h,
+                            -this.w / 2, -this.h / 2, this.w, this.h
+                        );
+                    } else {
+                        const frameW = this.image.width / this.frames;
+                        ctx.drawImage(this.image, this.frameX * frameW, 0, frameW, this.image.height, -this.w / 2, -this.h / 2, this.w, this.h);
+                    }
+                    ctx.restore();
+                } else {
+                    ctx.save();
+                    ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+                    ctx.rotate(this.rotation);
+                    ctx.fillStyle = 'rgba(255, 100, 0, 0.5)';
+                    ctx.beginPath();
+                    ctx.moveTo(this.w / 2, 0);
+                    ctx.lineTo(-this.w / 2, -this.h / 3);
+                    ctx.lineTo(-this.w / 2, this.h / 3);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+        };
+        game.animations.push(aura);
+
+        game.animations.push({
+            type: 'logic',
+            life: duration,
+            hitEnemies: new Set(),
+            update: function (dt) {
+                this.life -= dt;
+                user.vx = dx * speed;
+                user.vy = dy * speed;
+                user.keepVelocity = true;
+                user.isCasting = true;
+
+                // --- Beautiful Trail Effect ---
+                this.ghostTimer = (this.ghostTimer || 0) + dt;
+                if (this.ghostTimer > 0.02) {
+                    this.ghostTimer = 0;
+                    // Spawn afterimage of the aura
+                    game.animations.push({
+                        type: 'animation',
+                        x: aura.x, y: aura.y,
+                        w: aura.w, h: aura.h,
+                        image: aura.image,
+                        frames: aura.frames,
+                        frameX: aura.frameX,
+                        rotation: aura.rotation,
+                        life: 0.3,
+                        maxLife: 0.3,
+                        draw: function (ctx) {
+                            ctx.save();
+                            ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+                            if (this.frames < 4) ctx.rotate(this.rotation);
+                            if (this.frames >= 4 && this.frameX === 3) ctx.scale(1, -1);
+                            ctx.globalAlpha = (this.life / this.maxLife) * 0.3;
+
+                            const frameData = (params._loadedFrames && params._loadedFrames.length > this.frameX) ? params._loadedFrames[this.frameX] : null;
+                            if (frameData) {
+                                ctx.drawImage(this.image, frameData.x, frameData.y, frameData.w, frameData.h, -this.w / 2, -this.h / 2, this.w, this.h);
+                            } else {
+                                const frameW = this.image.width / this.frames;
+                                ctx.drawImage(this.image, this.frameX * frameW, 0, frameW, this.image.height, -this.w / 2, -this.h / 2, this.w, this.h);
+                            }
+                            ctx.restore();
+                        }
+                    });
+                    // Particles along the trail (Increased for richer sparks)
+                    // Blowing back opposite to dash direction
+                    const blowBackX = -dx * speed * 0.3;
+                    const blowBackY = -dy * speed * 0.3;
+
+                    for (let i = 0; i < 3; i++) {
+                        game.spawnParticles(
+                            user.x + user.width / 2 + (Math.random() - 0.5) * 20,
+                            user.y + user.height / 2 + (Math.random() - 0.5) * 20,
+                            3,
+                            '#ffcc00',
+                            blowBackX,
+                            blowBackY
+                        );
+                    }
+                }
+                // -----------------------------
+
+                const radius = 50;
+                const cx = user.x + user.width / 2;
+                const cy = user.y + user.height / 2;
+
+                game.enemies.forEach(e => {
+                    if (!this.hitEnemies.has(e) && !e.markedForDeletion) {
+                        const edx = (e.x + e.width / 2) - cx;
+                        const edy = (e.y + e.height / 2) - cy;
+                        if (Math.hypot(edx, edy) < radius) {
+                            e.takeDamage(damage, '#ffcc00', params.aetherCharge || 0);
+                            this.hitEnemies.add(e);
+                            if (e.hp <= 0 || e.markedForDeletion) killCount++;
+                            game.spawnParticles(e.x + e.width / 2, e.y + e.height / 2, 5, '#ff8800');
+                        }
+                    }
+                });
+
+                if (this.life <= 0) {
+                    user.isCasting = false;
+                    user.vx = 0; user.vy = 0;
+                    if (killCount > 0 && skillInstance) {
+                        skillInstance.currentCooldown = 0;
+                        skillInstance.stacks = skillInstance.maxStacks;
+                        game.spawnParticles(user.x + user.width / 2, user.y + user.height / 2, 15, '#ffff00');
+                        console.log("Phoenix Dive Reset! Kills:", killCount);
+                    }
                 }
             }
         });
     },
+
     'glacial_lotus': (user, game, params) => {
         const petalCount = params.petalCount || 12;
         const bloomRadius = params.bloomRadius || 60;
@@ -1101,10 +1297,10 @@ export const areaBehaviors = {
                     p.rotation = p._lotusAngle;
                 });
 
-                if (this.life <= 0) {
+                if (this.life <= 0 || bloomDuration <= 0) {
                     // BURST!
                     if (game.camera) game.camera.shake(0.5, 12);
-                    spawnIceShatter(game, cx, cy, 20); // Center burst
+                    spawnIceShatter(game, cx, cy, 15); // Center burst
 
                     petals.forEach(p => {
                         if (!p.active) return;
@@ -1122,18 +1318,18 @@ export const areaBehaviors = {
                         // Restore Hit Handler
                         p.onHitEnemy = function (enemy, gameInstance) {
                             enemy.takeDamage(this.damage, this.damageColor, this.aetherCharge);
-                            spawnIceShatter(gameInstance, this.x + this.w / 2, this.y + this.h / 2, 8);
+                            spawnIceShatter(gameInstance, this.x + this.width / 2, this.y + this.height / 2, 6);
 
                             // Aether Rush Scatter Effect
                             if (isCastInRush) {
                                 for (let i = 0; i < 3; i++) {
                                     const angle = Math.random() * Math.PI * 2;
                                     const speed = (params.burstSpeed || 900) * 0.6;
-                                    spawnProjectile(gameInstance, this.x + this.w / 2, this.y + this.h / 2, Math.cos(angle) * speed, Math.sin(angle) * speed, {
+                                    spawnProjectile(gameInstance, this.x + this.width / 2, this.y + this.height / 2, Math.cos(angle) * speed, Math.sin(angle) * speed, {
                                         ...params,
                                         damage: 5,
-                                        width: this.w * 0.5,
-                                        height: this.h * 0.5,
+                                        width: this.width * 0.5,
+                                        height: this.height * 0.5,
                                         isAetherRush: false, // Prevent infinite loops
                                         iceTrail: true,
                                         ghostTrail: true,
@@ -1149,18 +1345,18 @@ export const areaBehaviors = {
                             }
                         };
                         p.onHitWall = function (gameInstance) {
-                            spawnIceShatter(gameInstance, this.x + this.w / 2, this.y + this.h / 2, 8);
+                            spawnIceShatter(gameInstance, this.x + this.width / 2, this.y + this.height / 2, 6);
 
                             // Aether Rush Scatter Effect
                             if (isCastInRush) {
                                 for (let i = 0; i < 3; i++) {
                                     const angle = Math.random() * Math.PI * 2;
                                     const speed = (params.burstSpeed || 900) * 0.6;
-                                    spawnProjectile(gameInstance, this.x + this.w / 2, this.y + this.h / 2, Math.cos(angle) * speed, Math.sin(angle) * speed, {
+                                    spawnProjectile(gameInstance, this.x + this.width / 2, this.y + this.height / 2, Math.cos(angle) * speed, Math.sin(angle) * speed, {
                                         ...params,
                                         damage: 5,
-                                        width: this.w * 0.5,
-                                        height: this.h * 0.5,
+                                        width: this.width * 0.5,
+                                        height: this.height * 0.5,
                                         isAetherRush: false, // Prevent infinite loops
                                         iceTrail: true,
                                         ghostTrail: true,
@@ -1174,6 +1370,8 @@ export const areaBehaviors = {
                             this.life = 0;
                         };
                     });
+
+                    if (bloomDuration <= 0) this.life = 0;
                 }
             }
         });

@@ -77,8 +77,9 @@ export class Camera {
     }
 
     shake(duration, intensity) {
-        this.shakeTimer = duration;
-        this.shakeIntensity = intensity * 0.5; // Reduced by 50%
+        // Use Math.max to ensure stronger/longer shakes are not overwritten by weaker hits/effects
+        this.shakeTimer = Math.max(this.shakeTimer, duration);
+        this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
     }
 
     isVisible(x, y, w, h) {
@@ -107,12 +108,19 @@ export class Camera {
         }
 
         // Apply Shake
+        // Apply Shake
         if (this.shakeTimer > 0) {
-            this.shakeTimer -= dt;
+            // Apply offset first to ensure even single-frame shakes are visible
             const offsetX = (Math.random() - 0.5) * this.shakeIntensity * 2;
             const offsetY = (Math.random() - 0.5) * this.shakeIntensity * 2;
             this.x += offsetX;
             this.y += offsetY;
+
+            this.shakeTimer -= dt;
+            if (this.shakeTimer <= 0) {
+                this.shakeTimer = 0;
+                this.shakeIntensity = 0;
+            }
         }
 
         this.x = Math.max(0, Math.min(this.x, this.mapWidth - this.width));
@@ -154,10 +162,32 @@ export class Entity {
     }
 
     checkCollision(x, y) {
-        return this.game.map.isWall(x, y) ||
+        // Tile-based collision
+        const isWall = this.game.map.isWall(x, y) ||
             this.game.map.isWall(x + this.width, y) ||
             this.game.map.isWall(x, y + this.height) ||
             this.game.map.isWall(x + this.width, y + this.height);
+
+        if (isWall) return true;
+
+        // Entity-based solid collision (Crates, etc.)
+        // Block player and monsters (non-solid enemies)
+        const isMovable = this === this.game.player || (!this.isSolid && this.game.enemies.includes(this));
+        if (isMovable) {
+            const solidEntities = [
+                ...this.game.enemies,
+                ...this.game.entities
+            ].filter(e => e !== this && e.isSolid && !e.markedForDeletion);
+
+            for (const other of solidEntities) {
+                if (x < other.x + other.width && x + this.width > other.x &&
+                    y < other.y + other.height && y + this.height > other.y) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     takeDamage(amount) {

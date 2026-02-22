@@ -48,8 +48,8 @@ export class Goblin extends Enemy {
         // Removed !this.flashTimer check so attacks can start/continue while being hit
         if (!this.isTelegraphing && this.stunTimer <= 0 && this.attackCooldown <= 0) {
             const dist = Math.sqrt((this.game.player.x - this.x) ** 2 + (this.game.player.y - this.y) ** 2);
-            if (dist < 100) {
-                this.startTelegraph(1.6);
+            if (dist < 75) {
+                this.startTelegraph(1.2);
             }
         }
 

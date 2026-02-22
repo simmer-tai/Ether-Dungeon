@@ -12,7 +12,8 @@ const textures = {
 const statusIcons = {
     bleed: getCachedImage('assets/icon_bleed.png'),
     slow: getCachedImage('assets/icon_ice.png'),
-    burn: getCachedImage('assets/icon_burn.png')
+    burn: getCachedImage('assets/icon_burn.png'),
+    wet: getCachedImage('assets/icon_wet.png')
 };
 
 export class Enemy extends Entity {
@@ -166,6 +167,21 @@ export class Enemy extends Entity {
                     this.vx += (dx / dist) * acc * dt;
                     this.vy += (dy / dist) * acc * dt;
                 }
+
+                // --- Soft Separation AI (Avoid overlapping) ---
+                const separationDist = this.width * 0.8;
+                const separationForce = 150;
+                for (let other of this.game.entities) {
+                    if (other !== this && other instanceof Enemy) { // Corrected check
+                        const odx = other.x - this.x;
+                        const ody = other.y - this.y;
+                        const odist = Math.sqrt(odx * odx + ody * ody);
+                        if (odist < separationDist && odist > 0) {
+                            this.vx -= (odx / odist) * separationForce * dt;
+                            this.vy -= (ody / odist) * separationForce * dt;
+                        }
+                    }
+                }
             }
         }
 
@@ -230,6 +246,11 @@ export class Enemy extends Entity {
                     this.game.player.hp = Math.min(this.game.player.maxHp, this.game.player.hp + 1);
                 }
             }
+        }
+
+        // Camera Shake on hit
+        if (this.game.camera) {
+            this.game.camera.shake(0.05, 1.5);
         }
 
         // Apply Status Effects Damage Multiplier

@@ -2,7 +2,8 @@
 export const STATUS_TYPES = {
     BLEED: 'bleed',
     SLOW: 'slow',
-    BURN: 'burn'
+    BURN: 'burn',
+    WET: 'wet'
 };
 
 export class StatusManager {
@@ -12,6 +13,18 @@ export class StatusManager {
     }
 
     applyStatus(type, duration, magnitude = null, maxStacks = 10) {
+        // --- Elemental Interactions (Neutralization) ---
+        if (type === STATUS_TYPES.WET && this.effects.has(STATUS_TYPES.BURN)) {
+            this.effects.delete(STATUS_TYPES.BURN);
+            this.showStatusText('neutralized', 'Steam!');
+            return; // Water puts out fire, consumes the water shot too
+        }
+        if (type === STATUS_TYPES.BURN && this.effects.has(STATUS_TYPES.WET)) {
+            this.effects.delete(STATUS_TYPES.WET);
+            this.showStatusText('neutralized', 'Evaporate!');
+            return; // Fire evaporates water, consumes the fire shot too
+        }
+
         if (!this.effects.has(type)) {
             this.effects.set(type, {
                 stacks: 1,
@@ -25,8 +38,8 @@ export class StatusManager {
             effect.timer = duration; // Reset timer
             if (magnitude !== null) effect.magnitude = magnitude; // Update magnitude if provided
 
-            // Limit stacks (Special case for Burn: effectively unlimited)
-            const limit = (type === STATUS_TYPES.BURN) ? 999 : maxStacks;
+            // Limit stacks (Special case for Burn/Wet: effectively unlimited for duration refresh, but stacks matter)
+            const limit = (type === STATUS_TYPES.BURN || type === STATUS_TYPES.WET) ? 999 : maxStacks;
 
             if (effect.stacks < limit) {
                 effect.stacks++;
@@ -83,19 +96,25 @@ export class StatusManager {
     }
 
     // Helper for visual feedback
-    showStatusText(type, stacks) {
+    showStatusText(type, value) {
         let text = '';
         let color = '#fff';
 
         if (type === STATUS_TYPES.BLEED) {
-            text = `Bleed ${stacks}`;
+            text = `Bleed ${value}`;
             color = '#ff0000';
         } else if (type === STATUS_TYPES.BURN) {
-            text = `Burn ${stacks}`;
+            text = `Burn ${value}`;
             color = '#ff6600';
+        } else if (type === STATUS_TYPES.WET) {
+            text = `Wet ${value}`;
+            color = '#00aaff';
         } else if (type === 'burn_tick') {
-            text = `-${stacks}`; // Just show damage value for ticks
+            text = `-${value}`; // Just show damage value for ticks
             color = '#ff6600';
+        } else if (type === 'neutralized') {
+            text = value; // "Steam!" or "Evaporate!"
+            color = '#aae6ff';
         }
 
         if (this.owner.game) {

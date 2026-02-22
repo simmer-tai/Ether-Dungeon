@@ -146,8 +146,11 @@ export class Player extends Entity {
     }
 
     update(dt) {
-        this.vx = 0;
-        this.vy = 0;
+        if (!this.keepVelocity) {
+            this.vx = 0;
+            this.vy = 0;
+        }
+        this.keepVelocity = false;
         let moving = false;
 
         if (this.isDashing) {
