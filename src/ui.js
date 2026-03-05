@@ -137,8 +137,8 @@ export function drawUI(ctx, game, width, height) {
     }
 
 
-    // Update Currency (Dungeon Coins and Persistent Shards)
-    updateResources(game.player.dungeonCoins, game.player.aetherShards);
+    // Update Currency (Dungeon Coins and Persistent Shards/Fragments)
+    updateResources(game.player.dungeonCoins, game.player.aetherShards, game.player.aetherFragments);
 
     // Update Aether Gauge
     updateAetherGauge(game.player.aetherGauge, game.player.maxAetherGauge);
@@ -536,11 +536,13 @@ export function hideBlessingSelection() {
     }
 }
 
-export function updateResources(coins, shards) {
+export function updateResources(coins, shards, fragments) {
     const goldEl = document.getElementById('gold-value');
     const shardEl = document.getElementById('shard-value');
+    const fragmentEl = document.getElementById('fragment-value');
     if (goldEl) goldEl.textContent = Math.floor(coins);
     if (shardEl) shardEl.textContent = Math.floor(shards);
+    if (fragmentEl) fragmentEl.textContent = Math.floor(fragments);
 }
 
 

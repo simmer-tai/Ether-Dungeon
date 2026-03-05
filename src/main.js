@@ -746,7 +746,7 @@ class Game {
             p.hp = p.maxHp;
             _debugLog('祝福: HP全回復!');
         } else if (opt.id === 'shards') {
-            p.addAetherFragments(50);
+            p.addAetherShards(50);
             _debugLog('祝福: エーテルシャード50個を獲得!');
         } else if (opt.id === 'random_skill_grant') {
             // Pick a random skill now
@@ -761,7 +761,7 @@ class Game {
                         _debugLog(`祝福: ${skill.name} を習得!`);
                     } else {
                         _debugLog(`祝福: ${skill.name} は既に持っています! (シャード+20)`);
-                        p.addAetherFragments(20); // Small compensation for duplicate
+                        p.addAetherShards(20); // Small compensation for duplicate
                     }
                 }
             });
