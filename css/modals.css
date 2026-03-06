@@ -593,12 +593,12 @@
     box-sizing: border-box;
 }
 
-.blessing-card.blood-card:hover {
-    box-shadow: 0 0 30px rgba(255, 0, 0, 0.6) !important;
-}
-
 .blessing-card.blood-card .blessing-card-name {
     color: #ffcccc;
+}
+
+.blessing-card.blood-card:hover {
+    box-shadow: 0 0 30px rgba(255, 0, 0, 0.6) !important;
 }
 
 .acquired-title {

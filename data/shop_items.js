@@ -3,10 +3,6 @@
  *
  * skills_db.js からランダムに選んだスキルを販売する。
  * スキルの type によって価格帯を決定する：
- *   normal  → common  : 30〜80  シャード
- *   primary → rare    : 100〜200 シャード
- *   secondary → rare  : 100〜200 シャード
- *   ultimate → epic   : 250〜450 シャード
  */
 
 export const RARITY_PRICE_RANGE = {

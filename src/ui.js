@@ -86,9 +86,9 @@ function initSkillSlots() {
             slot.el.addEventListener('click', () => {
                 const game = window._gameInstance;
                 if (game && !game.isGameOver && game.gameState === 'PLAYING') {
-                    import('./ui/InventoryUI.js').then(({ InventoryUI }) => {
-                        InventoryUI.openForSlot(key);
-                    }).catch(err => console.error("Failed to load InventoryUI", err));
+                    if (game.player) {
+                        game.player.useSkill(key);
+                    }
                 }
             });
         }

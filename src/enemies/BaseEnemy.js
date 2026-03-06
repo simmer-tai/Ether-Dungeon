@@ -360,15 +360,25 @@ export class Enemy extends Entity {
                 }
             }
 
-            // --- Aether Shard/Fragment Drop Logic ---
-            let shardChance = 0.1; // Base 10%
-            const scoreVal = this.game.scoreManager ? this.game.scoreManager.getScoreValue(this.type) : 50;
-            if (scoreVal >= 500) shardChance = 0.3; // Boss 30%
-            else if (scoreVal >= 100) shardChance = 0.2; // Mid 20%
+            // --- Aether Shard/Fragment Drop Logic (50% fixed chance) ---
+            if (Math.random() < 0.5) {
+                const scoreVal = this.game.scoreManager ? this.game.scoreManager.getScoreValue(this.type) : this.scoreValue;
+                let shardCount = 1;
 
-            if (Math.random() < shardChance) {
-                const shardDrop = new DropItem(this.game, this.x + this.width / 2, this.y + this.height / 2, 1, 'shards');
-                this.game.entities.push(shardDrop);
+                if (scoreVal >= 500) { // Boss
+                    shardCount = 5 + Math.floor(Math.random() * 6); // 5-10
+                } else if (scoreVal >= 200) { // Elite
+                    shardCount = 2 + Math.floor(Math.random() * 3); // 2-4
+                } else if (scoreVal >= 100) { // Mid
+                    shardCount = 1 + Math.floor(Math.random() * 3); // 1-3
+                } else { // Weak
+                    shardCount = Math.random() < 0.2 ? 2 : 1; // 1 (20% for 2)
+                }
+
+                for (let i = 0; i < shardCount; i++) {
+                    const shardDrop = new DropItem(this.game, this.x + this.width / 2, this.y + this.height / 2, 1, 'shards');
+                    this.game.entities.push(shardDrop);
+                }
             }
 
             if (Math.random() < 0.05) { // 5% chance for Fragment

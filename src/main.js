@@ -574,24 +574,27 @@ class Game {
             // So rooms[0] is likely the Treasure Room.
 
             if (room.type === 'statue') {
-                // Spawn Statue in center
-                const sx = (room.x + Math.floor(room.w / 2)) * this.map.tileSize;
-                const sy = (room.y + Math.floor(room.h / 2)) * this.map.tileSize;
-                this.statues.push(new Statue(this, sx, sy));
+                // Spawn Statue in center (safely)
+                const pos = this.findSafeSpawnPosition(room);
+                if (pos) {
+                    this.statues.push(new Statue(this, pos.x, pos.y));
+                }
                 continue;
             }
 
             if (room.type === 'altar') {
-                const sx = (room.x + Math.floor(room.w / 2)) * this.map.tileSize;
-                const sy = (room.y + Math.floor(room.h / 2)) * this.map.tileSize;
-                this.bloodAltars.push(new BloodAltar(this, sx, sy));
+                const pos = this.findSafeSpawnPosition(room);
+                if (pos) {
+                    this.bloodAltars.push(new BloodAltar(this, pos.x, pos.y));
+                }
                 continue;
             }
 
             if (room.type === 'shop') {
-                const sx = (room.x + Math.floor(room.w / 2)) * this.map.tileSize;
-                const sy = (room.y + Math.floor(room.h / 2)) * this.map.tileSize;
-                this.shopNPCs.push(new ShopNPC(this, sx, sy));
+                const pos = this.findSafeSpawnPosition(room);
+                if (pos) {
+                    this.shopNPCs.push(new ShopNPC(this, pos.x, pos.y));
+                }
                 continue;
             }
 
@@ -716,6 +719,64 @@ class Game {
                 }
                 break;
         }
+    }
+
+    /**
+     * Finds a safe floor tile within a room, starting from the center.
+     * @param {Object} room Room object from map.rooms
+     * @returns {Object|null} {x, y} pixel coordinates or null
+     */
+    findSafeSpawnPosition(room) {
+        const cx = Math.floor(room.x + room.w / 2);
+        const cy = Math.floor(room.y + room.h / 2);
+
+        // 1. Check the absolute center first
+        if (this.map.tiles[cy] && this.map.tiles[cy][cx] === 0) {
+            return {
+                x: cx * this.map.tileSize,
+                y: cy * this.map.tileSize
+            };
+        }
+
+        // 2. Spiral/Radial search for the nearest floor tile
+        const maxRange = Math.max(room.w, room.h);
+        for (let r = 1; r < maxRange; r++) {
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    // Only check the "periphery" of the current radius r
+                    if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+
+                    const tx = cx + dx;
+                    const ty = cy + dy;
+
+                    // Stay within room bounds and check for floor
+                    if (tx >= room.x + 1 && tx < room.x + room.w - 1 &&
+                        ty >= room.y + 1 && ty < room.y + room.h - 1) {
+                        if (this.map.tiles[ty] && this.map.tiles[ty][tx] === 0) {
+                            return {
+                                x: tx * this.map.tileSize,
+                                y: ty * this.map.tileSize
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. Fallback: Systematic scan (should rarely reach here)
+        for (let ty = room.y + 1; ty < room.y + room.h - 1; ty++) {
+            for (let tx = room.x + 1; tx < room.x + room.w - 1; tx++) {
+                if (this.map.tiles[ty][tx] === 0) {
+                    return {
+                        x: tx * this.map.tileSize,
+                        y: ty * this.map.tileSize
+                    };
+                }
+            }
+        }
+
+        // No safe tile found in room interior
+        return null;
     }
 
     spawnParticles(x, y, count, color, baseVx = 0, baseVy = 0, options = {}) {
@@ -1286,9 +1347,10 @@ class Game {
 
                     // Reward?
                     if (Math.random() < 0.3) { // 30% chance for chest
-                        const cx = (currentRoom.x + Math.floor(currentRoom.w / 2)) * this.map.tileSize;
-                        const cy = (currentRoom.y + Math.floor(currentRoom.h / 2)) * this.map.tileSize;
-                        this.chests.push(new Chest(this, cx, cy));
+                        const pos = this.findSafeSpawnPosition(currentRoom);
+                        if (pos) {
+                            this.chests.push(new Chest(this, pos.x, pos.y));
+                        }
                     }
                 }
             }

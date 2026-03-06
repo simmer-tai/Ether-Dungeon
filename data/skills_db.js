@@ -264,7 +264,7 @@ export const skillsDB = [
         type: 'ultimate',
         element: 'fire',
         icon: 'assets/skills/icons/icon_ember_strike.png',
-        cooldown: 10.0,
+        cooldown: 13.0,
         behavior: 'barrage',
         description: '８つの火の玉を連射する奥義。',
         params: {

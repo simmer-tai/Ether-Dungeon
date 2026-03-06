@@ -107,6 +107,9 @@ export class Player extends Entity {
         // Aether Circuit System
         this.circuit = new AetherCircuitManager(this);
         this.loadAetherCircuit();
+
+        // Sync HP after chips are loaded to include bonuses
+        this.hp = this.maxHp;
     }
 
     loadAetherCircuit() {
