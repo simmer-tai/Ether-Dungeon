@@ -116,10 +116,10 @@ export class DropItem extends Entity {
             let label = "";
             if (this.type === 'coins') {
                 this.game.player.addDungeonCoins(this.value);
-                label = `COINS x ${this.value}`;
+                // label = `COINS x ${this.value}`; // Hidden as requested
             } else if (this.type === 'fragments') {
                 this.game.player.addAetherFragments(this.value);
-                label = `FRAGMENTS x ${this.value}`;
+                label = `エーテルフラグメント x ${this.value}`;
             } else if (this.type === 'chip') {
                 this.game.player.circuit.ownedChips.push(this.chipInstance);
                 this.game.logToScreen(`CHIP GET: ${this.chipInstance.data.name}`, this.color);
@@ -127,7 +127,7 @@ export class DropItem extends Entity {
                 label = `${this.chipInstance.data.name} x 1`;
             } else {
                 this.game.player.addAetherShards(this.value);
-                label = `SHARDS x ${this.value}`;
+                label = `エーテルシャード x ${this.value}`;
             }
 
             // Spawn floating text above player
@@ -137,7 +137,7 @@ export class DropItem extends Entity {
                     this.game.player.x + this.game.player.width / 2,
                     this.game.player.y - 30,
                     this.color,
-                    { font: "bold 16px 'Press Start 2P', monospace" }
+                    { font: "bold 8px sans-serif" }
                 );
             }
 
