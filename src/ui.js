@@ -424,23 +424,22 @@ const blessingCardsContainer = document.getElementById('blessing-selection-cards
 export function showBlessingSelection(options, onSelectCallback, source = 'default') {
     if (!blessingModal || !blessingCardsContainer) return;
 
+    // Set or Update Title
+    const title = blessingModal.querySelector('h2');
+    if (title) title.textContent = 'バフを選択';
+
     // Clear previous
     blessingCardsContainer.innerHTML = '';
 
     options.forEach(opt => {
         const card = document.createElement('div');
-        card.className = source === 'angel' ? 'blessing-card angel-card' : 'blessing-card';
+        let cardClass = 'blessing-card';
+        if (source === 'angel') cardClass += ' angel-card';
+        if (source === 'blood') cardClass += ' blood-card';
+        card.className = cardClass;
         card.dataset.id = opt.id;
 
-        // Name
-        const name = document.createElement('div');
-        name.className = 'blessing-card-name';
-        name.textContent = opt.name;
-        // Center the name explicitly since icon is gone
-        name.style.marginTop = '20px';
-        card.appendChild(name);
-
-        // Description
+        // Description Only (Centered via CSS)
         const desc = document.createElement('div');
         desc.className = 'blessing-card-desc';
         desc.textContent = opt.description || opt.desc || '';
@@ -469,6 +468,10 @@ export function showAcquiredBlessing(blessing, onConfirmCallback, source = 'bloo
     const existingBtn = container.querySelector('.acquire-btn-wrapper');
     if (existingBtn) existingBtn.remove();
 
+    // Set source class for title styling
+    blessingModal.classList.remove('source-angel', 'source-blood');
+    blessingModal.classList.add(`source-${source}`);
+
     // Change Title temporarily
     const title = blessingModal.querySelector('h2');
     const originalTitle = title ? title.textContent : '女神の祝福';
@@ -484,19 +487,17 @@ export function showAcquiredBlessing(blessing, onConfirmCallback, source = 'bloo
     const card = document.createElement('div');
     card.className = source === 'angel'
         ? 'blessing-card acquired angel-card'
-        : 'blessing-card acquired';
+        : 'blessing-card acquired blood-card'; // Added blood-card
     card.style.cursor = 'default';
 
     // Name (Now placed OUTSIDE/ABOVE the card)
     const name = document.createElement('div');
     name.className = 'blessing-card-name acquired-title';
     name.textContent = blessing.name;
-    name.style.color = source === 'angel' ? '#ffe066' : '#ff4444';
-    name.style.fontSize = '32px';
-    name.style.marginBottom = '0';
+    // name.style.color is now handled by .source-X .acquired-title in CSS
     wrapper.appendChild(name);
 
-    // Description (Inside card, will be centered via CSS)
+    // Description (Inside card)
     const desc = document.createElement('div');
     desc.className = 'blessing-card-desc';
     desc.textContent = blessing.description || blessing.desc || '';
@@ -505,7 +506,7 @@ export function showAcquiredBlessing(blessing, onConfirmCallback, source = 'bloo
     wrapper.appendChild(card);
     blessingCardsContainer.appendChild(wrapper);
 
-    // Acquire Button Wrapper (placed outside cards container)
+    // Acquire Button Wrapper
     const btnWrapper = document.createElement('div');
     btnWrapper.className = 'acquire-btn-wrapper';
     btnWrapper.style.marginTop = '30px';
@@ -516,7 +517,6 @@ export function showAcquiredBlessing(blessing, onConfirmCallback, source = 'bloo
     const btn = document.createElement('button');
     btn.className = 'acquire-btn';
     btn.textContent = '獲得';
-    btn.style.width = '200px'; // Fixed width when outside
     btn.addEventListener('click', () => {
         if (title) title.textContent = originalTitle;
         btnWrapper.remove();
