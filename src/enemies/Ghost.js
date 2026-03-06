@@ -4,8 +4,8 @@ import { getCachedJson } from '../utils.js';
 
 export class Ghost extends Enemy {
     constructor(game, x, y) {
-        // Ghost: lower health than goblin, spectral appearance, increased speed (80 -> 120)
-        super(game, x, y, 40, 48, 'rgba(150, 200, 255, 0.5)', 30, 120, 'ghost', 150);
+        // Ghost: lower health than goblin, spectral appearance, reduced speed (120 -> 60)
+        super(game, x, y, 40, 48, 'rgba(150, 200, 255, 0.5)', 30, 60, 'ghost', 150);
         this.displayName = 'ゴースト';
         this.ignoreWalls = true;
         this.damage = 8;
