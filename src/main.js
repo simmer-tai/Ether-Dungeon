@@ -736,6 +736,21 @@ class Game {
         }
     }
 
+    spawnFloatingText(text, x, y, color = 'white', options = {}) {
+        this.animations.push({
+            type: 'text',
+            text: text,
+            x: x,
+            y: y,
+            vx: options.vx || (Math.random() - 0.5) * 40,
+            vy: options.vy || -120, // Upward drift
+            life: options.life || 1.2,
+            maxLife: options.life || 1.2,
+            color: color,
+            font: options.font || "bold 20px 'Press Start 2P', monospace"
+        });
+    }
+
     applyReward(opt) {
         // console.log("Applying Reward:", opt.name);
         const p = this.player;

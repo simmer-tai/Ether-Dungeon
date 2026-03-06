@@ -910,18 +910,17 @@ export class Player extends Entity {
         }
 
         // 4. Damage Text (Override font for player)
-        this.game.animations.push({
-            type: 'text',
-            text: scaledDamage,
-            x: this.x + this.width / 2,
-            y: this.y - 20,
-            vx: (Math.random() - 0.5) * 60,
-            vy: -150,
-            life: 1.0,
-            maxLife: 1.0,
-            color: '#ff3333',
-            font: "bold 24px 'Press Start 2P', monospace"
-        });
+        this.game.spawnFloatingText(
+            scaledDamage,
+            this.x + this.width / 2,
+            this.y - 20,
+            '#ff3333',
+            {
+                vx: (Math.random() - 0.5) * 60,
+                vy: -150,
+                font: "bold 24px 'Press Start 2P', monospace"
+            }
+        );
 
         if (this.hp <= 0) {
             this.hp = 0;
