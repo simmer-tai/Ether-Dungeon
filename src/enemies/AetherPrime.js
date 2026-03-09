@@ -517,16 +517,35 @@ export class AetherPrime extends Boss {
         this.startTelegraph(1.5);
         sweepDrones.forEach(d => {
             d.state = 'sweep_move';
-            const margin = 100;
-            const rw = this.game.map.width * 32;
-            const rh = this.game.map.height * 32;
+            const margin = 60; // Margin from room walls
+            const tileSize = this.game.map.tileSize || 40;
+
+            // Try to find the boss room or default to a range around the boss
+            const bossRoom = this.game.map.rooms.find(r => r.type === 'boss');
             let tx, ty;
             let attempts = 0;
-            do {
-                tx = margin + Math.random() * (rw - margin * 2);
-                ty = margin + Math.random() * (rh - margin * 2);
-                attempts++;
-            } while (this.game.map.isWall(tx, ty) && attempts < 20);
+
+            if (bossRoom) {
+                const minX = bossRoom.x * tileSize + margin;
+                const minY = bossRoom.y * tileSize + margin;
+                const maxX = (bossRoom.x + bossRoom.w) * tileSize - margin;
+                const maxY = (bossRoom.y + bossRoom.h) * tileSize - margin;
+
+                do {
+                    tx = minX + Math.random() * (maxX - minX);
+                    ty = minY + Math.random() * (maxY - minY);
+                    attempts++;
+                } while (this.game.map.isWall(tx, ty) && attempts < 20);
+            } else {
+                // Fallback: 350px around the boss
+                const range = 350;
+                do {
+                    tx = (this.x + this.width / 2) + (Math.random() - 0.5) * range * 2;
+                    ty = (this.y + this.height / 2) + (Math.random() - 0.5) * range * 2;
+                    attempts++;
+                } while (this.game.map.isWall(tx, ty) && attempts < 20);
+            }
+
             d.sweepTarget = { x: tx, y: ty };
             d.sweepMoveSpeed = 400;
         });
