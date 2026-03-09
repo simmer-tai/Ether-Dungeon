@@ -7,7 +7,7 @@ import { spawnProjectile, spawnExplosion } from '../skills/common.js';
 class AetherDrone extends Enemy {
     constructor(game, owner, index) {
         const droneHp = 150;
-        const droneSpeed = 280; // Match rush speed
+        const droneSpeed = 200; // Match rush speed
         super(game, 0, 0, 24, 24, '#00ffff', droneHp, droneSpeed, null, 0);
         this.width = 24;
         this.height = 24;
@@ -26,7 +26,7 @@ class AetherDrone extends Enemy {
         this.isShielded = false;
         this.vx = 0;
         this.vy = 0;
-        this.rushSpeed = 280;
+        this.rushSpeed = 200;
         this.hitCooldown = 0;
     }
 
@@ -173,6 +173,8 @@ export class AetherPrime extends Boss {
             this.vx = 0;
             this.vy = 0;
             this.isOmniShield = false;
+            this.isTelegraphing = false;
+            this.droneRushTimer = 0;
             this.floatPhase += dt * 0.5;
 
             if (this.stunTimer <= 0) {
@@ -371,7 +373,7 @@ export class AetherPrime extends Boss {
     }
 
     decideAttack() {
-        if (this.stunTimer > 0) return;
+        if (this.stunTimer > 0 || this.droneRushTimer > 0) return;
 
         let picked = 'summon';
         const r = Math.random();
