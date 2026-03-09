@@ -124,8 +124,8 @@ export class AetherPrime extends Boss {
         super(game, x, y);
         this.width = 120;
         this.height = 120;
-        this.hp = 5000;
-        this.maxHp = 5000;
+        this.hp = 2000;
+        this.maxHp = 2000;
         this.speed = 15;
         this.displayName = "AETHER PRIME";
         this.score = 5000;

@@ -5,7 +5,7 @@ import { spawnExplosion, spawnProjectile } from '../skills/common.js';
 export class Boss extends Enemy {
     constructor(game, x, y) {
         // Base stats for Aether Golem
-        const hp = 3000;
+        const hp = 3500;
         const speed = 80; // Reduced from 100 to 80 (20% decrease)
         super(game, x, y, 90, 90, '#4444ff', hp, speed, 'boss', 5000);
 
