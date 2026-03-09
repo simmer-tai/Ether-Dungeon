@@ -105,9 +105,17 @@ class AetherDrone extends Enemy {
             if (this.flashTimer > 0) this.flashTimer -= dt;
         } else if (this.state === 'sweep_beam') {
             this.sweepTimer -= dt;
-            const progress = 1.0 - (this.sweepTimer / this.sweepMaxTimer);
-            // Slowly rotate from the locked start angle
-            this.currentAngleForDraw = this.sweepStartAngle + (this.sweepAngleRange * progress * this.sweepDirection);
+            const elapsed = this.sweepMaxTimer - this.sweepTimer;
+            const delay = 1.0; // 1 second fixed at start
+
+            if (elapsed > delay) {
+                // Start rotating after delay
+                const rotateProgress = (elapsed - delay) / (this.sweepMaxTimer - delay);
+                this.currentAngleForDraw = this.sweepStartAngle + (this.sweepAngleRange * rotateProgress * this.sweepDirection);
+            } else {
+                // Keep fixed for the first 1 second
+                this.currentAngleForDraw = this.sweepStartAngle;
+            }
 
             if (this.game && this.game.player) {
                 const bx = this.x + this.width / 2;
@@ -116,7 +124,7 @@ class AetherDrone extends Enemy {
                 const x2 = bx + Math.cos(this.currentAngleForDraw) * beamLength;
                 const y2 = by + Math.sin(this.currentAngleForDraw) * beamLength;
 
-                if (this.owner.checkBeamHit(this.game.player.x + this.game.player.width / 2, this.game.player.y + this.game.player.height / 2, 15, bx, by, x2, y2, 20)) {
+                if (this.owner.checkBeamHit(this.game.player.x + this.game.player.width / 2, this.game.player.y + this.game.player.height / 2, 15, bx, by, x2, y2, 14)) {
                     this.game.player.takeDamage(10);
                 }
             }
@@ -577,7 +585,7 @@ export class AetherPrime extends Boss {
         const drones = this.droneEntities.filter(d => d && !d.markedForDeletion && d.state === 'sweep_aim');
         const direction = Math.random() < 0.5 ? 1 : -1;
         const sweepAngle = (60 * Math.PI) / 180;
-        const duration = 2.0; // Slower sweep
+        const duration = 3.0; // 1.0s fixed + 2.0s sweep
 
         drones.forEach(d => {
             d.state = 'sweep_beam';
@@ -771,17 +779,26 @@ export class AetherPrime extends Boss {
                     ctx.arc(0, 0, 20, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // Drone Sweep Telegraph Line (Red)
+                    // Drone Sweep Telegraph Line (Match Boss Beam Style)
                     if (this.currentAttack === 'droneSweep' && (d.state === 'sweep_move' || d.state === 'sweep_aim')) {
-                        ctx.fillStyle = (d.state === 'sweep_aim') ? 'rgba(255, 0, 0, 0.4)' : 'rgba(255, 0, 0, 0.15)';
-                        ctx.fillRect(0, -5, 800, 10); // Thinner telegraph line
+                        const alpha = (d.state === 'sweep_aim') ? 0.3 : 0.15;
+                        const beamWidth = 14;
+                        ctx.save();
+                        ctx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
+                        ctx.fillRect(0, -beamWidth / 2, 800, beamWidth);
+
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha + 0.1})`;
+                        ctx.lineWidth = 1;
+                        ctx.setLineDash([10, 5]);
+                        ctx.strokeRect(0, -beamWidth / 2, 800, beamWidth);
+                        ctx.restore();
                     }
                 }
 
                 // --- Drone Sweep Beam (Active Fire) ---
                 if (d.state === 'sweep_beam') {
                     const beamLength = 800;
-                    const thickness = 20;
+                    const thickness = 14; // 30% thinner
                     const grad = ctx.createLinearGradient(0, 0, beamLength, 0);
                     grad.addColorStop(0, '#00ffff');
                     grad.addColorStop(1, 'rgba(0, 255, 255, 0)');
