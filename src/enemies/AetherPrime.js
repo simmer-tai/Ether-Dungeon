@@ -7,7 +7,7 @@ import { spawnProjectile, spawnExplosion } from '../skills/common.js';
 class AetherDrone extends Enemy {
     constructor(game, owner, index) {
         const droneHp = 150;
-        const droneSpeed = 200; // Match rush speed
+        const droneSpeed = 150; // Match rush speed
         super(game, 0, 0, 24, 24, '#00ffff', droneHp, droneSpeed, null, 0);
         this.width = 24;
         this.height = 24;
@@ -26,7 +26,7 @@ class AetherDrone extends Enemy {
         this.isShielded = false;
         this.vx = 0;
         this.vy = 0;
-        this.rushSpeed = 200;
+        this.rushSpeed = 150;
         this.hitCooldown = 0;
     }
 
@@ -71,6 +71,7 @@ class AetherDrone extends Enemy {
 
             this.currentAngleForDraw = Math.atan2(this.vy, this.vx);
             this.statusManager.update(dt);
+            if (this.flashTimer > 0) this.flashTimer -= dt; // Ensure flash timer clears during rush
             // Bypass friction and superUpdate in rush mode to maintain speed and bounce
         } else {
             if (this.state === 'return') {
@@ -111,6 +112,10 @@ class AetherDrone extends Enemy {
             spawnExplosion(this.game, this.x + this.width / 2, this.y + this.height / 2, '#00ffff', 0.5);
         }
         return res;
+    }
+
+    draw(ctx) {
+        // Drone's draw is handled by AetherPrime for centralized control/flash support
     }
 }
 
@@ -600,8 +605,9 @@ export class AetherPrime extends Boss {
         ctx.rotate(rotationAngle);
         if (this.image && this.image.complete) {
             if (this.stunTimer > 0) ctx.filter = 'grayscale(100%) opacity(70%)';
+            if (this.flashTimer > 0) ctx.filter = 'brightness(0) invert(1)';
             ctx.drawImage(this.image, -this.width / 2, -this.height / 2, this.width, this.height);
-            if (this.stunTimer > 0) ctx.filter = 'none';
+            ctx.filter = 'none';
         } else {
             ctx.fillStyle = '#006666';
             ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
@@ -631,7 +637,9 @@ export class AetherPrime extends Boss {
                 }
 
                 if (this.bitImage && this.bitImage.complete && this.bitImage.naturalWidth !== 0) {
+                    if (d.flashTimer > 0) ctx.filter = 'brightness(0) invert(1)';
                     ctx.drawImage(this.bitImage, -12, -12, 24, 24);
+                    ctx.filter = 'none';
                     // Draw Shield if active
                     if (d.isShielded) {
                         ctx.beginPath();
