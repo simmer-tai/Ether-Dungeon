@@ -1,11 +1,23 @@
 
+import { getCachedImage } from './utils.js';
+
+export const statusIcons = {
+    bleed: getCachedImage('assets/skills/icons/icon_bleed.png'),
+    slow: getCachedImage('assets/skills/icons/icon_slow.png'),
+    burn: getCachedImage('assets/skills/icons/icon_burn.png'),
+    wet: getCachedImage('assets/skills/icons/icon_wet.png'),
+    poison: getCachedImage('assets/skills/icons/icon_poison.png'),
+    shock: getCachedImage('assets/skills/icons/shock.png') // Fixed name from icon_shock.png
+};
+
 export const STATUS_TYPES = {
     BLEED: 'bleed',
     SLOW: 'slow',
     BURN: 'burn',
     WET: 'wet',
     POISON: 'poison',
-    SHOCK: 'shock'
+    SHOCK: 'shock',
+    PANDEMIC: 'pandemic'
 };
 
 export class StatusManager {
@@ -76,6 +88,19 @@ export class StatusManager {
                 }
             }
 
+            // Handle PANDEMIC (Forced Poison refresh)
+            if (type === STATUS_TYPES.PANDEMIC) {
+                // Ensure target always has high-stack Poison while in Pandemic
+                this.applyStatus(STATUS_TYPES.POISON, effect.timer, null, 20);
+                
+                // Visual effect: purple sparks/bubble particles
+                if (Math.random() < 0.2) {
+                    const px = this.owner.x + Math.random() * this.owner.width;
+                    const py = this.owner.y + Math.random() * this.owner.height;
+                    this.owner.game.spawnParticles(px, py, 1, '#800080', 0, -20);
+                }
+            }
+
             if (effect.timer <= 0) {
                 this.effects.delete(type);
             }
@@ -113,10 +138,25 @@ export class StatusManager {
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist <= range) {
-                // Apply chain damage (isChain = true to prevent recursion)
-                enemy.takeDamage(chainDamage, '#ffff00', 0, false, 0, 0, 0.2, true);
+                // Apply chain damage.
+                // takeDamage params: amount, color, aetherGain, isCrit, knockbackX, knockbackY, stunDuration, silent
+                // Set silent = false so the damage number shows up
+                enemy.takeDamage(chainDamage, '#ffff00', 0, false, 0, 0, 0.2, false);
                 
-                // Visual feedback: small bolt
+                // Visual feedback: Lightning Bolt connection
+                game.animations.push({
+                    type: 'lightning_bolt',
+                    x1: centerX,
+                    y1: centerY,
+                    x2: enemy.x + enemy.width / 2,
+                    y2: enemy.y + enemy.height / 2,
+                    color: '#ffff00',
+                    width: 3,
+                    life: 0.15,
+                    maxLife: 0.15
+                });
+
+                // Visual feedback: small bolt sparks
                 if (game.spawnLightningBurst) {
                     // Just a small burst or particle
                     game.spawnParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, 3, '#ffff00');
@@ -153,8 +193,23 @@ export class StatusManager {
 
     // Helper for visual feedback
     showStatusText(type, value) {
+        // If this is a status application, try to attach to the last damage animation
+        if (this.owner.lastDamageAnim && this.owner.lastDamageAnim.life > 0.5) {
+            const icon = statusIcons[type];
+            if (icon) {
+                if (!this.owner.lastDamageAnim.icons) this.owner.lastDamageAnim.icons = [];
+                // Avoid duplicate icons for the same status in one damage pop
+                if (!this.owner.lastDamageAnim.icons.includes(icon)) {
+                    this.owner.lastDamageAnim.icons.push(icon);
+                }
+                return;
+            }
+        }
+
+        // Fallback for cases where there's no recent damage (e.g. tick damage or pure status application)
         let text = '';
         let color = '#fff';
+        let icon = statusIcons[type];
 
         if (type === STATUS_TYPES.BLEED) {
             text = `Bleed ${value}`;
@@ -166,8 +221,8 @@ export class StatusManager {
             text = `Wet ${value}`;
             color = '#00aaff';
         } else if (type === 'burn_tick') {
-            text = `-${value}`; // Just show damage value for ticks
-            color = '#ff6600';
+            text = value; // Just show damage value for ticks, like normal damage
+            color = '#ffffff';
         } else if (type === STATUS_TYPES.POISON) {
             text = `Poison ${value}`;
             color = '#800080';
@@ -175,28 +230,33 @@ export class StatusManager {
             text = `Slow ${value}`;
             color = '#00ffff';
         } else if (type === 'poison_tick') {
-            text = `-${value}`;
-            color = '#800080';
+            text = value; // Like normal damage
+            color = '#ffffff';
         } else if (type === STATUS_TYPES.SHOCK) {
             text = `Shock ${value}`;
             color = '#ffff00';
         } else if (type === 'neutralized') {
             text = value; // "Steam!" or "Evaporate!"
             color = '#aae6ff';
+        } else if (type === STATUS_TYPES.PANDEMIC) {
+            text = 'PANDEMIC';
+            color = '#BF40BF';
         }
 
         if (this.owner.game) {
             this.owner.game.animations.push({
                 type: 'text',
+                isDamageText: true,
                 text: text,
                 x: this.owner.x + this.owner.width / 2,
                 y: this.owner.y - 10,
-                vx: 0,
-                vy: -50,
-                life: 0.5,
-                maxLife: 0.5,
+                vx: (Math.random() - 0.5) * 100, // Increased horizontal spread
+                vy: -100, // Status texts bounce slightly less than pure damage
+                life: 0.8,
+                maxLife: 0.8,
                 color: color,
-                font: '12px sans-serif'
+                font: '14px sans-serif',
+                icons: icon ? [icon] : []
             });
         }
     }

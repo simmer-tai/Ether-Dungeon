@@ -133,12 +133,16 @@ export class Bat extends Enemy {
         this.vy += (ty * 0.3 + this.randomDir.y) * 1000 * dt;
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
+        // Interpolated Position
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+
         // Draw Telegraph Area
         if (this.state === 'PREPARING') {
             ctx.save();
-            const startX = this.x + this.width / 2;
-            const startY = this.y + this.height / 2;
+            const startX = interpX + this.width / 2;
+            const startY = interpY + this.height / 2;
             const angle = Math.atan2(this.dashDir.y, this.dashDir.x);
             const progress = 1 - (this.telegraphTimer / 1.0);
 
@@ -161,6 +165,6 @@ export class Bat extends Enemy {
             ctx.restore();
         }
 
-        super.draw(ctx);
+        super.draw(ctx, alpha);
     }
 }

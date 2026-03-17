@@ -27,33 +27,36 @@ export class BloodAltar extends Entity {
         }
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+
         if (this.image.complete && this.image.naturalWidth !== 0) {
             ctx.save();
             if (this.used) ctx.filter = 'grayscale(100%) brightness(0.5)';
-            ctx.drawImage(this.image, Math.floor(this.x), Math.floor(this.y), this.width, this.height);
+            ctx.drawImage(this.image, interpX, interpY, this.width, this.height);
             ctx.restore();
         } else {
             // Placeholder: Ominous red pillar
             ctx.fillStyle = this.used ? '#330000' : '#880000';
-            ctx.fillRect(Math.floor(this.x), Math.floor(this.y), this.width, this.height);
+            ctx.fillRect(interpX, interpY, this.width, this.height);
             ctx.strokeStyle = '#ff0000';
             ctx.lineWidth = 4;
-            ctx.strokeRect(Math.floor(this.x), Math.floor(this.y), this.width, this.height);
+            ctx.strokeRect(interpX, interpY, this.width, this.height);
 
             // Glowing rune symbol (X)
             ctx.beginPath();
-            ctx.moveTo(this.x + 20, this.y + 20);
-            ctx.lineTo(this.x + this.width - 20, this.y + this.height - 20);
-            ctx.moveTo(this.x + this.width - 20, this.y + 20);
-            ctx.lineTo(this.x + 20, this.y + this.height - 20);
+            ctx.moveTo(interpX + 20, interpY + 20);
+            ctx.lineTo(interpX + this.width - 20, interpY + this.height - 20);
+            ctx.moveTo(interpX + this.width - 20, interpY + 20);
+            ctx.lineTo(interpX + 20, interpY + this.height - 20);
             ctx.stroke();
         }
     }
 
     getInteractPrompt() {
         if (this.used) return null;
-        return "[F] 血の祭壇を調べる";
+        return "[SPACE] 血の祭壇を調べる";
     }
 
     interact() {

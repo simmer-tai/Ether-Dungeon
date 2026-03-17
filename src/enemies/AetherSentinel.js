@@ -219,13 +219,17 @@ export class AetherSentinel extends Enemy {
         return super.takeDamage(amount, color, aether, crit, kx, ky, kd, silent, source);
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
+        // Interpolated Position
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+
         // --- 1. Shadow (Base logic restored) ---
         let spawnProgress = this.isSpawning ? (1 - (this.spawnTimer / (this.spawnDuration || 0.67))) : 1.0;
         spawnProgress = Math.max(0, Math.min(1.0, spawnProgress));
 
         ctx.save();
-        ctx.translate(this.x + this.width / 2, this.y + this.height);
+        ctx.translate(interpX + this.width / 2, interpY + this.height);
         ctx.scale(1, 0.5);
         ctx.fillStyle = `rgba(0, 0, 0, ${0.3 * spawnProgress})`;
         ctx.beginPath();
@@ -236,8 +240,8 @@ export class AetherSentinel extends Enemy {
 
         // --- 2. Main Body ---
         ctx.save();
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
+        const cx = interpX + this.width / 2;
+        const cy = interpY + this.height / 2;
         const floatY = Math.sin(this.floatPhase) * 6;
 
         ctx.translate(cx, cy + floatY);
@@ -321,11 +325,11 @@ export class AetherSentinel extends Enemy {
 
         // HP Bar and Status
         if (this.hp < this.maxHp) {
-            const barY = Math.floor(this.y + floatY - 12);
+            const barY = interpY + floatY - 12;
             ctx.fillStyle = 'red';
-            ctx.fillRect(Math.floor(this.x), barY, this.width, 4);
+            ctx.fillRect(interpX, barY, this.width, 4);
             ctx.fillStyle = 'green';
-            ctx.fillRect(Math.floor(this.x), barY, this.width * (this.hp / this.maxHp), 4);
+            ctx.fillRect(interpX, barY, this.width * (this.hp / this.maxHp), 4);
 
             // Name
             ctx.fillStyle = 'white';
@@ -333,10 +337,10 @@ export class AetherSentinel extends Enemy {
             ctx.textAlign = 'center';
             ctx.shadowColor = 'black';
             ctx.shadowBlur = 4;
-            ctx.fillText(this.displayName, this.x + this.width / 2, barY - 5);
+            ctx.fillText(this.displayName, interpX + this.width / 2, barY - 5);
             ctx.shadowBlur = 0;
         }
 
-        super.drawStatusIcons(ctx);
+        this.drawStatusIcons(ctx);
     }
 }

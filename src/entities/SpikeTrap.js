@@ -93,9 +93,11 @@ export class SpikeTrap extends Entity {
         this.hitCooldowns.set(entity, this.cooldownTime);
     }
 
-    draw(ctx) {
-        const x = Math.floor(this.x);
-        const y = Math.floor(this.y);
+    draw(ctx, alpha = 1) {
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+        const x = interpX;
+        const y = interpY;
         const w = this.width;
         const h = this.height;
 

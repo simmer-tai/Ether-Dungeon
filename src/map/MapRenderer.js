@@ -249,8 +249,8 @@ export class MapRenderer {
             for (let y = Math.max(0, startY); y < Math.min(this.map.height, endY); y++) {
                 for (let x = Math.max(0, startX); x < Math.min(this.map.width, endX); x++) {
                     if (this.map.tiles[y][x] === 0 && this.map.roomGrid[y][x] === -1) {
-                        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                        ctx.fillText('Path', x * this.map.tileSize + this.map.tileSize / 2, y * this.map.tileSize + this.map.tileSize / 2);
+                        ctx.fillStyle = 'rgba(255, 0, 255, 0.3)'; // Semi-transparent pink
+                        ctx.fillRect(x * this.map.tileSize, y * this.map.tileSize, this.map.tileSize, this.map.tileSize);
                     }
                 }
             }

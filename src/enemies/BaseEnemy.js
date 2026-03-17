@@ -1,5 +1,5 @@
 import { Entity, getCachedImage } from '../utils.js';
-import { StatusManager, STATUS_TYPES } from '../status_effects.js';
+import { StatusManager, STATUS_TYPES, statusIcons } from '../status_effects.js';
 import { spawnProjectile } from '../skills/index.js';
 import { DropItem } from '../entities/DropItem.js';
 import { AetherLabManager } from '../AetherLabManager.js';
@@ -11,17 +11,11 @@ const textures = {
     bat: 'assets/enemies/bat.png',
     goblin: 'assets/enemies/goblin.png',
     skeleton_archer: 'assets/enemies/skeleton_archer.png',
-    ghost: 'assets/enemies/ghost.png'
+    ghost: 'assets/enemies/ghost.png',
+    dummy: 'assets/enemies/slime.png'
 };
 
-const statusIcons = {
-    bleed: getCachedImage('assets/skills/icons/icon_bleed.png'),
-    slow: getCachedImage('assets/skills/icons/icon_slow.png'),
-    burn: getCachedImage('assets/skills/icons/icon_burn.png'),
-    wet: getCachedImage('assets/skills/icons/icon_wet.png'),
-    poison: getCachedImage('assets/skills/icons/icon_poison.png'),
-    shock: getCachedImage('assets/skills/icons/icon_shock.png')
-};
+// Status icons mapping (moved to status_effects.js to avoid circular dependency)
 
 export class Enemy extends Entity {
     constructor(game, x, y, width, height, color, baseHp, speed, textureKey, baseScoreValue = 0, level = 1) {
@@ -206,14 +200,16 @@ export class Enemy extends Entity {
                 // --- Soft Separation AI (Avoid overlapping) ---
                 const separationDist = this.width * 0.8;
                 const separationForce = CONFIG.ENEMY.SEPARATION_FORCE;
-                for (const other of this.game.entities) {
-                    if (other !== this && other instanceof Enemy) {
-                        const odx = other.x - this.x;
-                        const ody = other.y - this.y;
-                        const odist = Math.sqrt(odx * odx + ody * ody);
-                        if (odist < separationDist && odist > 0) {
-                            this.vx -= (odx / odist) * separationForce * dt;
-                            this.vy -= (ody / odist) * separationForce * dt;
+                if (this.game.enemies) {
+                    for (const other of this.game.enemies) {
+                        if (other !== this && other instanceof Enemy) {
+                            const odx = other.x - this.x;
+                            const ody = other.y - this.y;
+                            const odist = Math.sqrt(odx * odx + ody * ody);
+                            if (odist < separationDist && odist > 0) {
+                                this.vx -= (odx / odist) * separationForce * dt;
+                                this.vy -= (ody / odist) * separationForce * dt;
+                            }
                         }
                     }
                 }
@@ -363,24 +359,55 @@ export class Enemy extends Entity {
 
         // Spawn Damage Text (larger for crits)
         if (!silent) {
-            this.game.animations.push({
+            const finalColor = isCrit ? '#ffff00' : '#ffffff';
+            const anim = {
                 type: 'text',
-                text: isCrit ? `${amount}!` : amount,
+                isDamageText: true,
+                text: amount,
                 x: this.x + this.width / 2,
                 y: this.y,
-                vx: (Math.random() - 0.5) * 50,
-                vy: isCrit ? -130 : -100,
+                vx: (Math.random() - 0.5) * 180, // Wide horizontal spread
+                vy: isCrit ? -180 : -140, // Increased upward velocity
                 life: isCrit ? 1.0 : 0.8,
                 maxLife: isCrit ? 1.0 : 0.8,
-                color: damageColor || '#fff',
-                font: isCrit ? "bold 18px 'Meiryo', 'Hiragino Kaku Gothic ProN', 'MS PGothic', sans-serif" : "14px 'Meiryo', 'Hiragino Kaku Gothic ProN', 'MS PGothic', sans-serif"
-            });
+                color: finalColor,
+                font: isCrit ? "bold 18px 'Meiryo', 'Hiragino Kaku Gothic ProN', 'MS PGothic', sans-serif" : "14px 'Meiryo', 'Hiragino Kaku Gothic ProN', 'MS PGothic', sans-serif",
+                icons: []
+            };
+            this.game.animations.push(anim);
+            this.lastDamageAnim = anim;
         }
 
         if (this.hp <= 0) {
             this.hp = 0;
             this.markedForDeletion = true;
             this.game.spawnDeathEffect(this);
+
+            // Pandemic Spread
+            if (this.statusManager.effects.has(STATUS_TYPES.PANDEMIC)) {
+                // Spawn 4 homing spores to transmit the infection
+                for (let i = 0; i < 4; i++) {
+                    const angle = (i / 4) * Math.PI * 2;
+                    const speed = 200;
+                    spawnProjectile(this.game, this.x + this.width / 2, this.y + this.height / 2, Math.cos(angle) * speed, Math.sin(angle) * speed, {
+                        visual: true,
+                        color: '#BF40BF',
+                        shape: 'circle',
+                        width: 12,
+                        height: 12,
+                        damage: 0,
+                        life: 2.0,
+                        homing: true,
+                        homingRange: 300,
+                        homingStrength: 0.2,
+                        statusEffect: STATUS_TYPES.PANDEMIC,
+                        statusDuration: 5.0,
+                        pierce: 1,
+                        noTrail: false,
+                        trailColor: 'rgba(191, 64, 191, 0.5)'
+                    });
+                }
+            }
 
             // Notify Player of Kill (for Training Chip)
             if (this.game.player && this.game.player.onEnemyKill) {
@@ -487,12 +514,16 @@ export class Enemy extends Entity {
                 
                 // Scale with floor
                 resonanceGain += Math.floor(this.game.currentFloor * 1.5);
-                this.game.player.aetherResonance += resonanceGain;
+            this.game.player.aetherResonance += resonanceGain;
             }
         }
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
+        // Interpolated Position
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+
         if (this.image.complete && this.image.naturalWidth !== 0) {
             ctx.save();
 
@@ -501,7 +532,7 @@ export class Enemy extends Entity {
             spawnProgress = Math.max(0, Math.min(1.0, spawnProgress));
             const shadowAlpha = 0.3 * spawnProgress;
             ctx.save();
-            ctx.translate(this.x + this.width / 2, this.y + this.height);
+            ctx.translate(interpX + this.width / 2, interpY + this.height);
             ctx.scale(1, 0.5); // Oval
             ctx.fillStyle = 'rgba(0, 0, 0, ' + shadowAlpha + ')';
             ctx.beginPath();
@@ -523,12 +554,15 @@ export class Enemy extends Entity {
                 ctx.globalAlpha = spawnProgress;
             }
 
-            ctx.translate(this.x + this.width / 2, this.y + this.height); // Center bottom
+            ctx.translate(interpX + this.width / 2, interpY + this.height); // Center bottom
             ctx.scale(scaleX, scaleY);
 
             if (this.flashTimer > 0) {
                 // Apply white flash filter
                 ctx.filter = 'brightness(0) invert(1)';
+            } else if (this.statusManager.effects.has(STATUS_TYPES.PANDEMIC)) {
+                // Vibrant purple for Pandemic
+                ctx.filter = 'sepia(1) hue-rotate(250deg) saturate(5) brightness(0.8) contrast(1.2)';
             } else if (this.statusManager.effects.has(STATUS_TYPES.POISON)) {
                 // Dim green filter for Poison
                 ctx.filter = 'sepia(1) hue-rotate(85deg) saturate(3) brightness(0.6)';
@@ -538,14 +572,14 @@ export class Enemy extends Entity {
             ctx.drawImage(this.image, -this.width / 2, -this.height, this.width, this.height);
             ctx.restore();
         } else {
-            super.draw(ctx);
+            super.draw(ctx, alpha);
         }
 
         // Draw Telegraph Indicator
         if (this.isTelegraphing) {
             ctx.save();
             ctx.beginPath();
-            ctx.arc(this.x + this.width / 2, this.y + this.height / 2, 40, 0, Math.PI * 2);
+            ctx.arc(interpX + this.width / 2, interpY + this.height / 2, 40, 0, Math.PI * 2);
             ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
             ctx.lineWidth = 4;
             ctx.stroke();
@@ -554,7 +588,7 @@ export class Enemy extends Entity {
             const progress = 1 - (this.telegraphTimer / this.telegraphDuration);
             const radius = Math.max(0, 40 * progress);
             ctx.beginPath();
-            ctx.arc(this.x + this.width / 2, this.y + this.height / 2, radius, 0, Math.PI * 2);
+            ctx.arc(interpX + this.width / 2, interpY + this.height / 2, radius, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
             ctx.fill();
             ctx.restore();
@@ -617,5 +651,56 @@ export class Enemy extends Entity {
                 }
             }
         }
+    }
+}
+
+export class TrainingDummy extends Enemy {
+    constructor(game, x, y) {
+        super(game, x, y, 36, 36, '#888888', 99999999, 0, 'dummy', 0, 1);
+        this.displayName = "訓練用カカシ";
+        this.canDrop = false;
+        this.isDummy = true;
+        this.isSpawning = false; // Appear immediately
+        this.isSolid = true;
+        this.knockbackResistance = 1.0; // 100% resistance
+    }
+
+    update(dt) {
+        // Dummy doesn't follow player or move
+        this.statusManager.update(dt);
+        if (this.flashTimer > 0) this.flashTimer -= dt;
+
+        // Force reset any movement/knockback
+        this.vx = 0;
+        this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
+        this.knockbackDuration = 0;
+        
+        // Safety: ensure it's never deleted
+        this.markedForDeletion = false;
+        if (this.hp < 99999999) this.hp = 99999999;
+        
+        // Minimal bobbing for visual feedback
+        this.walkTimer += dt * 2;
+    }
+
+    takeDamage(amount, color, aether, crit, kx, ky, kd, silent, source) {
+        // Call super for damage text, but ensure it never hits 0 HP
+        this.hp = 99999999;
+        // Force kx, ky to 0 to prevent any slight movement
+        super.takeDamage(amount, color, 0, crit, 0, 0, 0, silent, source);
+        
+        // Reset state immediately
+        this.hp = 99999999;
+        this.markedForDeletion = false;
+    }
+
+    draw(ctx, alpha = 1) {
+        ctx.save();
+        // Add a gray/metallic filter to distinguish from a normal slime
+        ctx.filter = 'grayscale(1) brightness(0.8)';
+        super.draw(ctx, alpha);
+        ctx.restore();
     }
 }

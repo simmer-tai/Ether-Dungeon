@@ -408,6 +408,13 @@ export class Player extends Entity {
         }
     }
 
+    unequipSkill(slot) {
+        if (this.equippedSkills[slot]) {
+            console.log(`Unequipped from ${slot}`);
+            this.equippedSkills[slot] = null;
+        }
+    }
+
     update(dt) {
         if (this.invulnerable > 0) this.invulnerable -= dt;
         if (this.slowTimer > 0) this.slowTimer -= dt;
@@ -879,7 +886,11 @@ export class Player extends Entity {
         // this.game.spawnParticles(this.x + this.width / 2, this.y - 20, 5, '#fff');
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
+        // Interpolated Position for render and UI
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+
         // Find current direction sheet
         const moving = Math.abs(this.vx) > 1 || Math.abs(this.vy) > 1;
         let spriteKey = moving ? 'yoko' : 'idol_yoko';
@@ -934,7 +945,7 @@ export class Player extends Entity {
                     ctx.save();
                     const auraIntensity = this.isAetherRush ? 1.0 : (this.aetherGauge / this.maxAetherGauge);
                     ctx.globalAlpha = 0.3 * auraIntensity;
-                    ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+                    ctx.translate(interpX + this.width / 2, interpY + this.height / 2);
                     const auraSize = this.width * (1.2 + Math.sin(this.animTimer * 6) * 0.1);
                     
                     const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, auraSize);
@@ -951,7 +962,7 @@ export class Player extends Entity {
 
                 ctx.save();
                 ctx.globalAlpha *= this.alpha;
-                ctx.translate(Math.floor(this.x + this.width / 2), Math.floor(this.y + this.height));
+                ctx.translate(interpX + this.width / 2, interpY + this.height);
                 ctx.scale(this.scale, this.scale);
                 ctx.rotate(this.rotation);
 
@@ -989,22 +1000,22 @@ export class Player extends Entity {
                 ctx.drawImage(
                     sheet.img,
                     frameData.x, frameData.y, frameData.w, frameData.h,
-                    Math.floor(drawX - this.width / 2), Math.floor(drawY - this.height), Math.floor(drawWidth), Math.floor(drawHeight)
+                    drawX - this.width / 2, drawY - this.height, drawWidth, drawHeight
                 );
                 ctx.restore();
             } else {
-                super.draw(ctx);
+                super.draw(ctx, alpha);
             }
         } else {
-            super.draw(ctx);
+            super.draw(ctx, alpha);
         }
 
         // Draw Charge Gauge
         if (this.isCharging) {
             const barW = 40;
             const barH = 6;
-            const barX = this.x + (this.width - barW) / 2;
-            const barY = this.y - 15;
+            const barX = interpX + (this.width - barW) / 2;
+            const barY = interpY - 15;
 
             // BG
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';

@@ -86,12 +86,14 @@ export class ShopNPC extends Entity {
         // However, if the player is near any item, they are likely near the NPC (~80px in main.js).
     }
 
-    draw(ctx) {
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
+    draw(ctx, alpha = 1) {
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+        const cx = interpX + this.width / 2;
+        const cy = interpY + this.height / 2;
 
         // Determine if player is to the left
-        const px = this.game.player.x + this.game.player.width / 2;
+        const px = this.game.player.prevX + (this.game.player.x - this.game.player.prevX) * alpha + this.game.player.width / 2;
         const facingLeft = px < cx;
 
         // NPC image
@@ -102,7 +104,7 @@ export class ShopNPC extends Entity {
                 ctx.scale(-1, 1);
                 ctx.translate(-cx, 0);
             }
-            ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+            ctx.drawImage(this.image, interpX, interpY, this.width, this.height);
             ctx.restore();
         }
 
@@ -139,10 +141,10 @@ export class ShopNPC extends Entity {
             const item = this.stock[this.hoveredItemIndex];
             if (!item.sold) {
                 const canAfford = this.game.player.dungeonCoins >= item.price;
-                return canAfford ? `[F] ${item.name} を購入` : "エーテルコイン不足";
+                return canAfford ? `[SPACE] ${item.name} を購入` : "エーテルコイン不足";
             }
         }
-        return "[F] ショップを見る";
+        return "[SPACE] ショップを見る";
     }
 
     interact() {

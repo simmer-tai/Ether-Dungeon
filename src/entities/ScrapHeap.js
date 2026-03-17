@@ -61,24 +61,27 @@ export class ScrapHeap extends Entity {
         // Static object
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+
         if (this.image.complete && this.image.naturalWidth !== 0) {
             const aspectRatio = this.image.naturalHeight / this.image.naturalWidth;
             const drawWidth = this.visualWidth;
             const drawHeight = drawWidth * aspectRatio;
             
             // Center visually over the hitbox and align bottom
-            const drawX = this.x + (this.width - drawWidth) / 2;
-            const drawY = (this.y + this.height) - drawHeight;
+            const drawX = interpX + (this.width - drawWidth) / 2;
+            const drawY = (interpY + this.height) - drawHeight;
             
-            ctx.drawImage(this.image, Math.floor(drawX), Math.floor(drawY), drawWidth, drawHeight);
+            ctx.drawImage(this.image, drawX, drawY, drawWidth, drawHeight);
         } else {
             // Metallic block placeholder (using visual size for the dummy)
-            const drawX = this.x + (this.width - this.visualWidth) / 2;
+            const drawX = interpX + (this.width - this.visualWidth) / 2;
             ctx.fillStyle = '#444';
-            ctx.fillRect(Math.floor(drawX), Math.floor(this.y), this.visualWidth, this.height);
+            ctx.fillRect(drawX, interpY, this.visualWidth, this.height);
             ctx.strokeStyle = '#222';
-            ctx.strokeRect(Math.floor(drawX), Math.floor(this.y), this.visualWidth, this.height);
+            ctx.strokeRect(drawX, interpY, this.visualWidth, this.height);
         }
     }
 }

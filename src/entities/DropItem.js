@@ -150,15 +150,20 @@ export class DropItem extends Entity {
         }
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
         if (this.image && this.image.complete && this.image.naturalWidth !== 0) {
             ctx.save();
+            
+            // Interpolated Position
+            const interpX = this.prevX + (this.x - this.prevX) * alpha;
+            const interpY = this.prevY + (this.y - this.prevY) * alpha;
+
             if (this.type === 'chip') {
                 ctx.shadowColor = this.color;
                 ctx.shadowBlur = 15;
 
-                const drawX = Math.floor(this.x);
-                const drawY = Math.floor(this.y + (this.renderYOffset || 0));
+                const drawX = interpX;
+                const drawY = interpY + (this.renderYOffset || 0);
 
                 // Rotation/pulse
                 const pulse = 1 + Math.sin(this.floatTimer * 2) * 0.05;

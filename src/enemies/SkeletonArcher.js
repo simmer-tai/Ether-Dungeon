@@ -157,11 +157,15 @@ export class SkeletonArcher extends Enemy {
         return true;
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
         if (!this.walkData || this.walkFrames.length === 0 || !this.fullSheet.complete || this.fullSheet.naturalWidth === 0) {
-            super.draw(ctx);
+            super.draw(ctx, alpha);
             return;
         }
+
+        // Interpolated Position
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
 
         ctx.save(); // Main save for SkeletonArcher draw
 
@@ -178,7 +182,7 @@ export class SkeletonArcher extends Enemy {
         const spawnProgress = this.isSpawning ? (1 - (this.spawnTimer / this.spawnDuration)) : 1.0;
         const shadowAlpha = 0.3 * spawnProgress;
         ctx.save();
-        ctx.translate(this.x + this.width / 2, this.y + this.height);
+        ctx.translate(interpX + this.width / 2, interpY + this.height);
         ctx.scale(1, 0.5); // Oval
         ctx.fillStyle = 'rgba(0, 0, 0, ' + shadowAlpha + ')';
         ctx.beginPath();
@@ -193,7 +197,7 @@ export class SkeletonArcher extends Enemy {
 
         ctx.save();
         const faceLeft = this.game.player.x < this.x;
-        ctx.translate(this.x + this.width / 2, this.y + this.height);
+        ctx.translate(interpX + this.width / 2, interpY + this.height);
         if (faceLeft) ctx.scale(-1, 1);
 
         if (this.flashTimer > 0) ctx.filter = 'brightness(0) invert(1)';
@@ -211,15 +215,20 @@ export class SkeletonArcher extends Enemy {
 
         if (this.isTelegraphing) {
             ctx.save();
-            const startX = this.x + this.width / 2;
-            const startY = this.y + this.height / 2;
-            const dx = this.targetAimPos.x - startX;
-            const dy = this.targetAimPos.y - startY;
+            const startX = interpX + this.width / 2;
+            const startY = interpY + this.height / 2;
+            
+            // Interpolate Aim Position
+            const interpAimX = this.prevAimX + (this.targetAimPos.x - this.prevAimX) * alpha;
+            const interpAimY = this.prevAimY + (this.targetAimPos.y - this.prevAimY) * alpha;
+
+            const dx = interpAimX - startX;
+            const dy = interpAimY - startY;
             const angle = Math.atan2(dy, dx);
 
             // Raycasting to find wall
-            let lineEndX = this.targetAimPos.x;
-            let lineEndY = this.targetAimPos.y;
+            let lineEndX = interpAimX;
+            let lineEndY = interpAimY;
             const step = 8;
             const maxDist = 2000;
             const cos = Math.cos(angle);
@@ -254,11 +263,11 @@ export class SkeletonArcher extends Enemy {
 
         this.drawStatusIcons(ctx);
         if (this.hp < this.maxHp) {
-            const barY = Math.floor(this.y - 35);
+            const barY = interpY - 35;
             ctx.fillStyle = 'red';
-            ctx.fillRect(Math.floor(this.x), barY, this.width, 4);
+            ctx.fillRect(interpX, barY, this.width, 4);
             ctx.fillStyle = 'green';
-            ctx.fillRect(Math.floor(this.x), barY, this.width * (this.hp / this.maxHp), 4);
+            ctx.fillRect(interpX, barY, this.width * (this.hp / this.maxHp), 4);
 
             // Draw Name
             ctx.fillStyle = 'white';
@@ -266,10 +275,16 @@ export class SkeletonArcher extends Enemy {
             ctx.textAlign = 'center';
             ctx.shadowColor = 'black';
             ctx.shadowBlur = 4;
-            ctx.fillText(this.displayName, this.x + this.width / 2, barY - 4);
+            ctx.fillText(this.displayName, interpX + this.width / 2, barY - 4);
             ctx.shadowBlur = 0;
             ctx.textAlign = 'start';
         }
+    }
+
+    savePrevPos() {
+        super.savePrevPos();
+        this.prevAimX = this.targetAimPos.x;
+        this.prevAimY = this.targetAimPos.y;
     }
 
     executeAttack() {

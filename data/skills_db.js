@@ -12,7 +12,7 @@ export const skillsDB = [
             knockback: 50,
             count: 6, // Number of pellets
             angleSpread: 45, // Spread in degrees
-            damage: 3,
+            damage: 5,
             speed: 600,
             randomSpeed: 150, // Variation in speed
             life: 0.3, // Short range (increased from 0.233)
@@ -384,7 +384,7 @@ export const skillsDB = [
         icon: 'assets/skills/icons/icon_ice_garden.png', // Placeholder
         cooldown: 10.0,
         behavior: 'ice_garden',
-        description: '範囲内の敵を減速させ、足元から氷の棘で攻撃するエリアを展開する。',
+        description: '範囲内の敵を減速させ、足元から氷の棘で攻撃するエリアを10秒間展開する。',
         params: {
             damage: 5, // Damage per spike
             duration: 10.0,
@@ -613,7 +613,7 @@ export const skillsDB = [
         icon: 'assets/skills/icons/icon_magma_core.png',
         cooldown: 10.0,
         behavior: 'magma_core',
-        description: '自身の周囲を回転する２つのマグマの核を生成する。核が敵に触れるとその足元に激しい噴火を引き起こし、周囲を焼き尽くす。',
+        description: '自身の周囲を回転する２つのマグマの核を12秒間生成する。核が敵に触れるとその足元に激しい噴火を引き起こし、周囲を焼き尽くす。',
         params: {
             damage: 7,
             duration: 12.0,
@@ -641,7 +641,7 @@ export const skillsDB = [
         icon: 'assets/skills/icons/icon_volt_drive.png', // Placeholder
         cooldown: 20.0,
         behavior: 'volt_drive',
-        description: '一定時間、雷光と化して戦場を疾駆する奥義。移動速度が大幅に上昇し、ダッシュで敵を貫き、周囲に自動で雷撃を放つ。',
+        description: '雷光と化して6秒間、戦場を疾駆する奥義。移動速度が大幅に上昇し、ダッシュで敵を貫き、周囲に自動で雷撃を放つ。',
         params: {
             duration: 6.0,
             speedMult: 1.5,
@@ -752,5 +752,81 @@ export const skillsDB = [
             critMultiplier: 2.0
         },
         aetherRushDesc: 'ビームの威力が２倍になり、攻撃範囲がさらに拡大する。'
+    },
+    {
+        id: 'poison_lake',
+        name: 'ポイズンレイク',
+        type: 'normal',
+        element: 'poison',
+        icon: 'assets/skills/icons/icon_poison.png',
+        cooldown: 0.1, // 連射式
+        behavior: 'projectile',
+        description: '前方に細い毒針を連射する。命中した敵に毒を付与するが、弾道に多少のばらつきがある。',
+        params: {
+            damage: 3, // ダメージを3に
+            speed: 1200,
+            width: 20,
+            height: 6,
+            life: 0.6,
+            shape: 'triangle',
+            fixedOrientation: true,
+            angleSpread: 15, // 射撃精度の誤差
+            color: '#32CD32',
+            trailColor: 'rgba(50, 205, 50, 0.5)',
+            damageColor: '#800080',
+            statusEffect: 'poison',
+            statusChance: 0.5,
+            statusDuration: 5.0,
+            aetherCharge: 1.5,
+            critChance: 0.1,
+            critMultiplier: 1.5
+        }
+    },
+    {
+        id: 'miasma_cloud',
+        name: 'ミアズマ・クラウド',
+        type: 'primary',
+        element: 'poison',
+        icon: 'assets/skills/icons/icon_poison.png',
+        cooldown: 4.0,
+        behavior: 'poison_cloud',
+        description: '6秒間持続する毒ガスを生成し、範囲内の敵を毒状態にする。',
+        params: {
+            damage: 2,
+            range: 120,
+            duration: 6.0,
+            interval: 0.5,
+            damageColor: '#800080',
+            aetherCharge: 2.0,
+            statusEffect: 'poison'
+        }
+    },
+
+    {
+        id: 'pandemic',
+        name: 'パンデミック',
+        type: 'ultimate',
+        element: 'poison',
+        icon: 'assets/skills/icons/icon_poison.png',
+        cooldown: 25.0,
+        behavior: 'projectile',
+        description: '伝染性の疫病を放つ。感染した敵が死亡すると、周囲の敵へ次々に感染が広がる。',
+        params: {
+            damage: 30,
+            speed: 800,
+            width: 40,
+            height: 40,
+            life: 2.0,
+            color: '#BF40BF',
+            trailColor: 'rgba(191, 64, 191, 0.6)',
+            damageColor: '#BF40BF',
+            statusEffect: 'pandemic',
+            statusDuration: 10.0,
+            pierce: 1,
+            aetherCharge: 0,
+            critChance: 0.2,
+            critMultiplier: 1.5
+        },
+        aetherRushDesc: '感染範囲と拡散する胞子の数が増加し、さらに起爆効果が付与される。'
     }
 ];

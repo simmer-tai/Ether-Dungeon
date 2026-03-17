@@ -13,37 +13,40 @@ export class Statue extends Entity {
         // Static entity
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+
         if (this.image.complete && this.image.naturalWidth !== 0) {
             ctx.save();
             if (this.used) ctx.filter = 'grayscale(100%) brightness(0.5)';
-            ctx.drawImage(this.image, Math.floor(this.x), Math.floor(this.y), this.width, this.height);
+            ctx.drawImage(this.image, interpX, interpY, this.width, this.height);
             ctx.restore();
         } else {
             // Placeholder: Angelic winged block
             ctx.fillStyle = this.used ? '#555' : '#fff';
-            ctx.fillRect(Math.floor(this.x), Math.floor(this.y), this.width, this.height);
+            ctx.fillRect(interpX, interpY, this.width, this.height);
             ctx.strokeStyle = '#000';
-            ctx.strokeRect(Math.floor(this.x), Math.floor(this.y), this.width, this.height);
+            ctx.strokeRect(interpX, interpY, this.width, this.height);
 
             // Wing shapes
             ctx.fillStyle = this.used ? '#444' : '#e0f0ff';
             ctx.beginPath();
-            ctx.moveTo(this.x, this.y + 10);
-            ctx.lineTo(this.x - 10, this.y - 5);
-            ctx.lineTo(this.x, this.y + 20);
+            ctx.moveTo(interpX, interpY + 10);
+            ctx.lineTo(interpX - 10, interpY - 5);
+            ctx.lineTo(interpX, interpY + 20);
             ctx.fill();
             ctx.beginPath();
-            ctx.moveTo(this.x + this.width, this.y + 10);
-            ctx.lineTo(this.x + this.width + 10, this.y - 5);
-            ctx.lineTo(this.x + this.width, this.y + 20);
+            ctx.moveTo(interpX + this.width, interpY + 10);
+            ctx.lineTo(interpX + this.width + 10, interpY - 5);
+            ctx.lineTo(interpX + this.width, interpY + 20);
             ctx.fill();
         }
     }
 
     getInteractPrompt() {
         if (this.used) return null;
-        return "[F] 祈る";
+        return "[SPACE] 祈る";
     }
 
     interact() {

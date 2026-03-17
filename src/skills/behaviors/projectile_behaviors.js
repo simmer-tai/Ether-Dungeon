@@ -22,6 +22,13 @@ export const projectileBehaviors = {
         vx = dirX * params.speed;
         vy = dirY * params.speed;
 
+        if (params.angleSpread) {
+            const currentAngle = Math.atan2(vy, vx);
+            const spreadRad = (Math.random() - 0.5) * params.angleSpread * (Math.PI / 180);
+            vx = Math.cos(currentAngle + spreadRad) * params.speed;
+            vy = Math.sin(currentAngle + spreadRad) * params.speed;
+        }
+
         if (params.fixedOrientation) {
             params.rotation = Math.atan2(vy, vx);
         }
@@ -2023,7 +2030,7 @@ export const projectileBehaviors = {
                     ctx.restore();
                 };
 
-                // Core Beam Visuals (Large Bolts) - Redistributed as "Scattered"
+                // Core Beam Visuals (Large Bolts) - Restored with yellow/white coloring
                 if (Math.random() < 0.3) {
                     const d = Math.random() * rayLength;
                     const across = (Math.random() - 0.5) * thick * 0.5;
@@ -2042,9 +2049,10 @@ export const projectileBehaviors = {
                         width: thick * (1.2 + Math.random() * 0.8),
                         height: thick * (1.5 + Math.random() * 1.5),
                         rotation: angle + (Math.random() - 0.5) * 0.3,
-                        color: params.color,
-                        filter: 'sepia(1) saturate(10) hue-rotate(0deg) brightness(2.0)',
-                        blendMode: 'lighter'
+                        color: '#ffffff',
+                        filter: 'sepia(1) saturate(20) hue-rotate(20deg) brightness(4)',
+                        blendMode: 'lighter',
+                        noTrail: true
                     });
                 }
 
@@ -2067,9 +2075,10 @@ export const projectileBehaviors = {
                         width: thick * (0.3 + Math.random() * 0.7),
                         height: thick * (0.1 + Math.random() * 0.4),
                         rotation: Math.random() * Math.PI * 2,
-                        color: params.color,
-                        filter: 'sepia(1) saturate(10) hue-rotate(0deg) brightness(1.5)',
-                        blendMode: 'lighter'
+                        color: '#ffffff',
+                        filter: 'sepia(1) saturate(20) hue-rotate(20deg) brightness(3)',
+                        blendMode: 'lighter',
+                        noTrail: true
                     });
                 }
             }

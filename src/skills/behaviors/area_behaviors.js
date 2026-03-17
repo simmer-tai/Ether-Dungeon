@@ -2067,4 +2067,101 @@ export const areaBehaviors = {
             }
         });
     },
+    'poison_cloud': (user, game, params) => {
+        const duration = params.duration || 6.0;
+        const targetRadius = params.range || 120;
+        const interval = params.interval || 0.5;
+
+        game.animations.push({
+            type: 'poison_cloud',
+            x: user.x + user.width / 2,
+            y: user.y + user.height / 2,
+            currentRadius: 0,
+            targetRadius: targetRadius,
+            life: duration,
+            maxLife: duration,
+            tickTimer: 0,
+            expandDuration: 0.8, // Seconds to reach target size
+            update: function (dt) {
+                // Expand radius smoothly
+                const age = this.maxLife - this.life;
+                if (age < this.expandDuration) {
+                    const p = age / this.expandDuration;
+                    // Ease out cubic
+                    this.currentRadius = this.targetRadius * (1 - Math.pow(1 - p, 3));
+                } else {
+                    this.currentRadius = this.targetRadius;
+                }
+
+                this.tickTimer += dt;
+                
+                // Cloud Particles
+                if (Math.random() < 0.45) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const r = Math.random() * this.currentRadius;
+                    game.animations.push({
+                        type: 'particle',
+                        x: this.x + Math.cos(angle) * r,
+                        y: this.y + Math.sin(angle) * r,
+                        w: 16 + Math.random() * 20,
+                        h: 16 + Math.random() * 20,
+                        life: 0.8 + Math.random() * 0.5,
+                        maxLife: 1.3,
+                        color: Math.random() < 0.5 ? 'rgba(50, 205, 50, 0.4)' : 'rgba(144, 238, 144, 0.3)',
+                        vx: (Math.random() - 0.5) * 15,
+                        vy: -(10 + Math.random() * 15),
+                        update: function (pdt) {
+                            this.life -= pdt;
+                            this.w += 12 * pdt;
+                            this.h += 12 * pdt;
+                        },
+                        draw: function (ctx) {
+                            ctx.save();
+                            ctx.globalAlpha = (this.life / this.maxLife) * 0.4;
+                            ctx.fillStyle = this.color;
+                            ctx.beginPath();
+                            ctx.arc(this.x, this.y, this.w / 2, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.restore();
+                        }
+                    });
+                }
+
+                if (this.tickTimer >= interval) {
+                    this.tickTimer = 0;
+                    game.enemies.forEach(enemy => {
+                        const dx = (enemy.x + enemy.width / 2) - this.x;
+                        const dy = (enemy.y + enemy.height / 2) - this.y;
+                        if (Math.hypot(dx, dy) < this.currentRadius) {
+                            enemy.takeDamage(params.damage, params.damageColor, params.aetherCharge, false);
+                            if (enemy.statusManager) {
+                                enemy.statusManager.applyStatus('poison', 4.0); // 4s poison per tick
+                            }
+                        }
+                    });
+                }
+            },
+            draw: function (ctx) {
+                // Background mist for the cloud area
+                ctx.save();
+                const lifeRatio = this.life / this.maxLife;
+                const alpha = Math.min(0.2, lifeRatio * 0.4);
+                
+                // Subtle pulse
+                const pulse = 1.0 + Math.sin(Date.now() / 400) * 0.03;
+                const drawRadius = this.currentRadius * pulse;
+
+                const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, drawRadius);
+                grad.addColorStop(0, `rgba(60, 220, 60, ${alpha})`);
+                grad.addColorStop(0.6, `rgba(50, 200, 50, ${alpha * 0.5})`);
+                grad.addColorStop(1, 'rgba(40, 180, 40, 0)');
+                
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, drawRadius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        });
+    }
 };

@@ -52,7 +52,10 @@ export class WoodCrate extends Entity {
         // Crates are static, no need for complex update
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+
         if (this.image.complete && this.image.naturalWidth !== 0) {
             // Keep aspect ratio
             const aspectRatio = this.image.naturalHeight / this.image.naturalWidth;
@@ -61,20 +64,20 @@ export class WoodCrate extends Entity {
 
             // Align bottom of image with bottom of the hitbox (tile grid)
             const offsetY = drawHeight - this.height;
-            ctx.drawImage(this.image, Math.floor(this.x), Math.floor(this.y - offsetY), drawWidth, drawHeight);
+            ctx.drawImage(this.image, interpX, interpY - offsetY, drawWidth, drawHeight);
         } else {
             // Placeholder: Brown box with a vertical perspective look
             // Top face (square)
             ctx.fillStyle = '#8B4513';
-            ctx.fillRect(Math.floor(this.x), Math.floor(this.y), this.width, this.height);
+            ctx.fillRect(interpX, interpY, this.width, this.height);
 
             // Front face (rectangle below, or just a darker shade at bottom)
             ctx.fillStyle = '#5D2E0B';
-            ctx.fillRect(Math.floor(this.x), Math.floor(this.y + this.height * 0.7), this.width, this.height * 0.3);
+            ctx.fillRect(interpX, interpY + this.height * 0.7, this.width, this.height * 0.3);
 
             ctx.strokeStyle = '#3D1E07';
             ctx.lineWidth = 2;
-            ctx.strokeRect(Math.floor(this.x), Math.floor(this.y), this.width, this.height);
+            ctx.strokeRect(interpX, interpY, this.width, this.height);
         }
     }
 }

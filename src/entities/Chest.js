@@ -73,31 +73,33 @@ export class Chest extends Entity {
         // Static entity, no movement
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
         const img = this.opened ? this.imageOpen : this.imageClosed;
 
         if (img.complete && img.naturalWidth !== 0) {
-            ctx.drawImage(img, Math.floor(this.x), Math.floor(this.y), this.width, this.height);
+            ctx.drawImage(img, interpX, interpY, this.width, this.height);
         } else {
             // Fallback rendering
             ctx.fillStyle = this.opened ? '#8B4513' : this.color; // Brown if opened
-            ctx.fillRect(Math.floor(this.x), Math.floor(this.y), this.width, this.height);
+            ctx.fillRect(interpX, interpY, this.width, this.height);
 
             ctx.strokeStyle = '#000';
             ctx.lineWidth = 2;
-            ctx.strokeRect(Math.floor(this.x), Math.floor(this.y), this.width, this.height);
+            ctx.strokeRect(interpX, interpY, this.width, this.height);
 
             // Lock detail
             if (!this.opened) {
                 ctx.fillStyle = '#000';
-                ctx.fillRect(Math.floor(this.x + 12), Math.floor(this.y + 12), 6, 6);
+                ctx.fillRect(interpX + 12, interpY + 12, 6, 6);
             }
         }
     }
 
     getInteractPrompt() {
         if (this.opened) return null;
-        return "[F] 宝箱を開ける";
+        return "[SPACE] 宝箱を開ける";
     }
 
     interact() {

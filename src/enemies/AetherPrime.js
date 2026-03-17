@@ -319,7 +319,7 @@ export class AetherPrime extends Boss {
             d.update(dt); // Crucial: Call drone's specific update
 
             if (d.state === 'orbit') {
-                // Erratic "Swarm" Movement Logic (縦横無尽)
+                // Erratic \"Swarm\" Movement Logic (縦横無尽)
                 // Combine multiple sine/cosine waves with different frequencies and phases
                 const baseAngle = (i / this.bitCount) * Math.PI * 2;
                 const orbitSpeed = 0.8;
@@ -340,7 +340,7 @@ export class AetherPrime extends Boss {
                 const targetX = cx + Math.cos(angle) * orbitDist + floatX - d.width / 2;
                 const targetY = cy + Math.sin(angle) * orbitDist + floatY - d.height / 2;
 
-                // Smooth interpolation to target to make it feel "active" but not teleporting
+                // Smooth interpolation to target to make it feel \"active\" but not teleporting
                 const lerpFactor = 5.0 * dt;
                 d.x += (targetX - d.x) * Math.min(1.0, lerpFactor);
                 d.y += (targetY - d.y) * Math.min(1.0, lerpFactor);
@@ -352,7 +352,7 @@ export class AetherPrime extends Boss {
                         d.currentAngleForDraw = Math.atan2(this.game.player.y - (d.y + d.height / 2), this.game.player.x - (d.x + d.width / 2));
                     }
                 } else {
-                    // Face "forward" in its orbit/drift path
+                    // Face \"forward\" in its orbit/drift path
                     d.currentAngleForDraw = angle + Math.PI / 2 + angleOffset;
                 }
             }
@@ -694,12 +694,9 @@ export class AetherPrime extends Boss {
                 ctx.shadowColor = this.color;
 
                 if (options.isBeam) {
-                    // Slender rectangle shape (Longer and Thinner)
                     const length = size;
                     const thickness = 3;
                     ctx.fillRect(-length / 2, -thickness / 2, length, thickness);
-
-                    // Core white line
                     ctx.fillStyle = '#fff';
                     ctx.fillRect(-length / 2, -thickness / 4, length, thickness / 2);
                 } else {
@@ -707,7 +704,6 @@ export class AetherPrime extends Boss {
                     ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
                     ctx.fill();
                 }
-
                 ctx.restore();
             }
         });
@@ -718,9 +714,12 @@ export class AetherPrime extends Boss {
         return super.takeDamage(amount, color, aether, crit, 0, 0, kd, silent, source);
     }
 
-    draw(ctx) {
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
+    draw(ctx, alpha = 1) {
+        // Interpolated Position for AetherPrime
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+        const cx = interpX + this.width / 2;
+        const cy = interpY + this.height / 2;
 
         ctx.save();
         ctx.translate(cx, cy);
@@ -755,8 +754,15 @@ export class AetherPrime extends Boss {
         if (this.droneEntities) {
             this.droneEntities.forEach((d, i) => {
                 if (!d || d.markedForDeletion) return;
+                
+                // Interpolated Position for Drone
+                const dInterpX = d.prevX + (d.x - d.prevX) * alpha;
+                const dInterpY = d.prevY + (d.y - d.prevY) * alpha;
+                const dcx = dInterpX + d.width / 2;
+                const dcy = dInterpY + d.height / 2;
+
                 ctx.save();
-                ctx.translate(d.x + d.width / 2, d.y + d.height / 2);
+                ctx.translate(dcx, dcy);
 
                 const targetAngle = d.currentAngleForDraw || 0;
                 ctx.rotate(targetAngle);
@@ -774,13 +780,13 @@ export class AetherPrime extends Boss {
 
                     // Drone Sweep Telegraph Line (Match Boss Beam Style)
                     if (this.currentAttack === 'droneSweep' && (d.state === 'sweep_move' || d.state === 'sweep_aim')) {
-                        const alpha = (d.state === 'sweep_aim') ? 0.3 : 0.15;
+                        const alphaVal = (d.state === 'sweep_aim') ? 0.3 : 0.15;
                         const beamWidth = 14;
                         ctx.save();
-                        ctx.fillStyle = `rgba(255, 0, 0, ${alpha})`;
+                        ctx.fillStyle = `rgba(255, 0, 0, ${alphaVal})`;
                         ctx.fillRect(0, -beamWidth / 2, 800, beamWidth);
 
-                        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha + 0.1})`;
+                        ctx.strokeStyle = `rgba(255, 255, 255, ${alphaVal + 0.1})`;
                         ctx.lineWidth = 1;
                         ctx.setLineDash([10, 5]);
                         ctx.strokeRect(0, -beamWidth / 2, 800, beamWidth);
@@ -847,8 +853,8 @@ export class AetherPrime extends Boss {
                 if (d.hp < d.maxHp) {
                     const bw = 24;
                     const bh = 3;
-                    const bx = d.x + d.width / 2 - bw / 2;
-                    const by = d.y - 6;
+                    const bx = dInterpX + d.width / 2 - bw / 2;
+                    const by = dInterpY - 6;
 
                     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
                     ctx.fillRect(bx, by, bw, bh);
@@ -861,6 +867,9 @@ export class AetherPrime extends Boss {
                     ctx.lineWidth = 0.5;
                     ctx.strokeRect(bx, by, bw, bh);
                 }
+
+                // Final status icons for drones
+                if (d.drawStatusIcons) d.drawStatusIcons(ctx);
             });
         }
 
@@ -885,5 +894,7 @@ export class AetherPrime extends Boss {
             ctx.restore();
         }
 
+        // Draw Boss HP Bar (standard for bosses if preferred, though Prime often relies on shield mechanic)
+        super.drawHPBar(ctx);
     }
 }

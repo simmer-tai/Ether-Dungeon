@@ -94,7 +94,7 @@ export const spawnProjectile = (game, x, y, vx, vy, params) => {
             this.vy += (this.ay || 0) * dt;
             this.x += this.vx * dt;
             this.y += this.vy * dt;
-            this.life -= dt;
+            if (!params.visual) this.life -= dt;
             if (this.life <= 0 && this.onDestroy) this.onDestroy(game);
 
             // Animate Sprite
@@ -156,7 +156,7 @@ export const spawnProjectile = (game, x, y, vx, vy, params) => {
                         h: 3 + Math.random() * 3,
                         life: 0.4,
                         maxLife: 0.4,
-                        color: this.trailColor || (this.iceTrail ? 'rgba(180, 230, 255, 0.4)' : 'rgba(255,100,0,1)'),
+                        color: this.trailColor || (this.iceTrail ? 'rgba(180, 230, 255, 0.4)' : (this.color || 'rgba(255,100,0,1)')),
                         shape: params.trailShape,
                         vx: (Math.random() - 0.5) * 30,
                         vy: (Math.random() - 0.5) * 30
@@ -273,7 +273,7 @@ export const spawnProjectile = (game, x, y, vx, vy, params) => {
 
                     let filter = 'none';
                     if (params.crackleColor === '#FFFF00') {
-                        filter = 'sepia(1) saturate(10) hue-rotate(0deg) brightness(1.2)';
+                        filter = 'sepia(1) saturate(10) hue-rotate(20deg) brightness(1.8)';
                     }
 
                     spawnProjectile(game, this.x + this.w / 2 + offsetX, this.y + this.h / 2 + offsetY, 0, 0, {
@@ -434,8 +434,8 @@ export const spawnBounceSparkImpact = (game, x, y, options = {}) => {
             height: 50 + Math.random() * 20,
             randomRotation: true,
             rotation: Math.random() * Math.PI * 2,
-            color: '#a5f2f3',
-            filter: 'sepia(1) saturate(10) hue-rotate(0deg) brightness(1.2)',
+            color: '#ffffff',
+            filter: 'sepia(1) saturate(10) hue-rotate(20deg) brightness(1.5)',
             blendMode: 'lighter',
             noTrail: true
         });
@@ -493,8 +493,8 @@ export const spawnThunderBurstImpact = (game, x, y, options = {}) => {
             height: 50 * sizeScale + Math.random() * 20,
             randomRotation: true,
             rotation: Math.random() * Math.PI * 2,
-            color: '#a5f2f3',
-            filter: 'sepia(1) saturate(10) hue-rotate(0deg) brightness(1.2)',
+            color: '#ffffff',
+            filter: 'sepia(1) saturate(10) hue-rotate(20deg) brightness(1.5)',
             blendMode: 'lighter',
             noTrail: true
         });
@@ -576,7 +576,7 @@ export const spawnThunderfallImpact = (game, x, y, scale = 1.0) => {
             randomRotation: true,
             rotation: Math.random() * Math.PI * 2,
             color: '#ffff00',
-            filter: 'sepia(1) saturate(10) hue-rotate(0deg) brightness(1.5)', // Brighter
+            filter: 'sepia(1) saturate(10) hue-rotate(20deg) brightness(2.0)', // Yellow/Bright
             blendMode: 'lighter',
             noTrail: true
         });
@@ -605,8 +605,8 @@ export const spawnThunderfallImpact = (game, x, y, scale = 1.0) => {
             height: (30 + Math.random() * 30) * scale,
             randomRotation: true, // Randomize orientation
             rotation: Math.random() * Math.PI * 2,
-            color: '#ffff00',
-            filter: 'sepia(1) saturate(10) hue-rotate(0deg) brightness(1.2)',
+            color: '#ffffff',
+            filter: 'sepia(1) saturate(10) hue-rotate(20deg) brightness(1.5)',
             blendMode: 'lighter',
             noTrail: true
         });
@@ -751,7 +751,7 @@ export const spawnLightningBolt = (game, x, y, options = {}) => {
             randomRotation: false,
             rotation: angle,
             color: color,
-            filter: 'sepia(1) saturate(10) hue-rotate(0deg) brightness(1.5)', // Yellow/Bright
+            filter: 'sepia(1) saturate(10) hue-rotate(20deg) brightness(1.8)', // Yellow/Bright
             blendMode: 'lighter',
             noTrail: true
         });

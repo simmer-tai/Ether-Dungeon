@@ -521,66 +521,96 @@ function drawMiniMap(ctx, game, screenWidth, screenHeight) {
     ctx.lineWidth = 1;
     ctx.strokeRect(mmX - 5, mmY - 5, mmW + 10, mmH + 10);
 
-    // Draw Map Tiles
-    for (let y = 0; y < map.height; y++) {
-        for (let x = 0; x < map.width; x++) {
-            const tile = map.tiles[y][x];
+    // Initialize or Redraw Offscreen Canvas if dirty
+    if (!game.minimapCanvas) {
+        game.minimapCanvas = document.createElement('canvas');
+        game.minimapCanvas.width = mmW;
+        game.minimapCanvas.height = mmH;
+        game.minimapCtx = game.minimapCanvas.getContext('2d', { alpha: false });
+        // Force initial draw
+        map.minimapDirty = true;
+    } else if (game.minimapCanvas.width !== Math.floor(mmW) || game.minimapCanvas.height !== Math.floor(mmH)) {
+        game.minimapCanvas.width = mmW;
+        game.minimapCanvas.height = mmH;
+        map.minimapDirty = true;
+    }
 
-            // Check for Staircase
-            let isStaircase = false;
-            let isShop = false;
-            let isBoss = false;
-            // Check room grid for staircase type
-            if (map.roomGrid && map.roomGrid[y] && map.roomGrid[y][x] !== -1) {
-                const roomId = map.roomGrid[y][x];
-                const room = map.rooms[roomId];
-                if (room && room.type === 'staircase') {
-                    const centerX = room.x + Math.floor(room.w / 2);
-                    const centerY = room.y + Math.floor(room.h / 2);
-                    // Highlight center 2x2
-                    if ((x === centerX || x === centerX - 1) && (y === centerY || y === centerY - 1)) {
-                        isStaircase = true;
+    if (map.minimapDirty) {
+        const oCtx = game.minimapCtx;
+        oCtx.fillStyle = '#000000'; // Black background for transparency representation
+        oCtx.fillRect(0, 0, mmW, mmH);
+
+        // Draw Map Tiles
+        for (let y = 0; y < map.height; y++) {
+            for (let x = 0; x < map.width; x++) {
+                const tile = map.tiles[y][x];
+
+                // Check for Staircase
+                let isStaircase = false;
+                let isShop = false;
+                let isBoss = false;
+                // Check room grid for staircase type
+                if (map.roomGrid && map.roomGrid[y] && map.roomGrid[y][x] !== -1) {
+                    const roomId = map.roomGrid[y][x];
+                    const room = map.rooms[roomId];
+                    if (room && room.type === 'staircase') {
+                        const centerX = room.x + Math.floor(room.w / 2);
+                        const centerY = room.y + Math.floor(room.h / 2);
+                        // Highlight center 2x2
+                        if ((x === centerX || x === centerX - 1) && (y === centerY || y === centerY - 1)) {
+                            isStaircase = true;
+                        }
+                    }
+                    if (room && room.type === 'shop') {
+                        isShop = true;
+                    }
+                    if (room && room.type === 'boss') {
+                        isBoss = true;
                     }
                 }
-                if (room && room.type === 'shop') {
-                    isShop = true;
-                }
-                if (room && room.type === 'boss') {
-                    isBoss = true;
-                }
-            }
 
-            if (isStaircase) {
-                if (game.debugMode || map.exploredTiles[y][x]) {
-                    ctx.fillStyle = '#00ffff'; // Cyan for stairs
-                    ctx.fillRect(mmX + x * scale, mmY + y * scale, scale, scale);
-                }
-            } else if (isBoss && tile === 0) {
-                if (game.debugMode || map.exploredTiles[y][x]) {
-                    ctx.fillStyle = 'rgba(255, 0, 0, 0.4)'; // Red tint for boss room
-                    ctx.fillRect(mmX + x * scale, mmY + y * scale, scale, scale);
-                }
-            } else if (isShop && tile === 0) {
-                if (game.debugMode || map.exploredTiles[y][x]) {
-                    ctx.fillStyle = 'rgba(255, 200, 0, 0.35)'; // Gold tint for shop floor
-                    ctx.fillRect(mmX + x * scale, mmY + y * scale, scale, scale);
-                }
-            } else if (tile === 1) {
-                // Wall
-                if (game.debugMode || map.exploredTiles[y][x]) {
-                    ctx.fillStyle = '#888';
-                    ctx.fillRect(mmX + x * scale, mmY + y * scale, scale, scale);
-                }
-                // Floor - Do nothing (Transparent/Background)
-            } else if (tile === 0) {
-                // Floor
-                if (game.debugMode || map.exploredTiles[y][x]) {
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'; // Very subtle floor highlight?
-                    ctx.fillRect(mmX + x * scale, mmY + y * scale, scale, scale);
+                if (isStaircase) {
+                    if (game.debugMode || map.exploredTiles[y][x]) {
+                        oCtx.fillStyle = '#00ffff'; // Cyan for stairs
+                        oCtx.fillRect(x * scale, y * scale, scale, scale);
+                    }
+                } else if (isBoss && tile === 0) {
+                    if (game.debugMode || map.exploredTiles[y][x]) {
+                        oCtx.fillStyle = '#660000'; // Red tint (solid color) for boss room
+                        oCtx.fillRect(x * scale, y * scale, scale, scale);
+                    }
+                } else if (isShop && tile === 0) {
+                    if (game.debugMode || map.exploredTiles[y][x]) {
+                        oCtx.fillStyle = '#665000'; // Gold tint (solid color) for shop floor
+                        oCtx.fillRect(x * scale, y * scale, scale, scale);
+                    }
+                } else if (tile === 1) {
+                    // Wall
+                    if (game.debugMode || map.exploredTiles[y][x]) {
+                        oCtx.fillStyle = '#888888';
+                        oCtx.fillRect(x * scale, y * scale, scale, scale);
+                    }
+                } else if (tile === 0) {
+                    // Floor
+                    if (game.debugMode || map.exploredTiles[y][x]) {
+                        oCtx.fillStyle = '#1a1a1a'; // Very subtle floor highlight
+                        oCtx.fillRect(x * scale, y * scale, scale, scale);
+                    }
                 }
             }
         }
+        map.minimapDirty = false;
     }
+
+    // Draw static minimap
+    // Using globalCompositeOperation to act like background
+    ctx.globalCompositeOperation = 'source-over';
+    
+    // We treat '#'000000' as transparent via global composite, or just draw normally.
+    // Drawing normally as the background of the mm is already '#000'. But we want it semi-transparent.
+    ctx.globalCompositeOperation = 'screen'; // Black becomes transparent
+    ctx.drawImage(game.minimapCanvas, mmX, mmY);
+    ctx.globalCompositeOperation = 'source-over'; // Reset
 
     // Draw Statues
     if (game.statues) {

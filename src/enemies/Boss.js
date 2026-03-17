@@ -565,7 +565,12 @@ export class Boss extends Enemy {
         }
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
+        // Interpolated Position
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+        const interpJumpHeight = this.isJumping ? (this.prevJumpHeight !== undefined ? this.prevJumpHeight + (this.jumpHeight - this.prevJumpHeight) * alpha : this.jumpHeight) : 0;
+
         // 1. Draw Telegraph Indicator (Custom for Boss)
         if (this.isTelegraphing) {
             ctx.save();
@@ -574,19 +579,19 @@ export class Boss extends Enemy {
             if (this.currentAttack === 'slam') {
                 // Slam Circle
                 ctx.beginPath();
-                ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.groundSlamRange, 0, Math.PI * 2);
+                ctx.arc(interpX + this.width / 2, interpY + this.height / 2, this.groundSlamRange, 0, Math.PI * 2);
                 ctx.strokeStyle = `rgba(255, 0, 0, ${0.2 + progress * 0.4})`;
                 ctx.lineWidth = 4;
                 ctx.stroke();
 
                 ctx.beginPath();
-                ctx.arc(this.x + this.width / 2, this.y + this.height / 2, this.groundSlamRange * progress, 0, Math.PI * 2);
+                ctx.arc(interpX + this.width / 2, interpY + this.height / 2, this.groundSlamRange * progress, 0, Math.PI * 2);
                 ctx.fillStyle = 'rgba(255, 0, 0, 0.15)';
                 ctx.fill();
             } else if (this.currentAttack === 'dash') {
                 // Dash Line
                 ctx.save();
-                ctx.translate(this.x + this.width / 2, this.y + this.height / 2);
+                ctx.translate(interpX + this.width / 2, interpY + this.height / 2);
                 ctx.rotate(this.dashAngle);
                 ctx.fillStyle = `rgba(255, 0, 0, 0.1)`;
                 ctx.fillRect(0, -this.height / 2.5, 800, this.height * 0.8);
@@ -655,14 +660,14 @@ export class Boss extends Enemy {
 
             ctx.save();
             // Height offset for jump
-            ctx.translate(this.x + this.width / 2, this.y + this.height - (this.isJumping ? this.jumpHeight : 0));
+            ctx.translate(interpX + this.width / 2, interpY + this.height - interpJumpHeight);
 
             // Flip logic
             let flip = false;
             if (Math.abs(this.vx) > 5) {
                 flip = this.vx < 0;
             } else if (this.game.player) {
-                flip = (this.game.player.x + this.game.player.width / 2) < (this.x + this.width / 2);
+                flip = (this.game.player.x + this.game.player.width / 2) < (interpX + this.width / 2);
             }
             if (flip) ctx.scale(-1, 1);
 
@@ -695,7 +700,12 @@ export class Boss extends Enemy {
             );
             ctx.restore();
         } else {
-            super.draw(ctx);
+            super.draw(ctx, alpha);
         }
+    }
+
+    savePrevPos() {
+        super.savePrevPos();
+        this.prevJumpHeight = this.jumpHeight;
     }
 }

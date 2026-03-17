@@ -40,6 +40,7 @@ export class Map {
         this.connector = new RoomConnector(this);
         this.hasBoss = false;
         this.bossDefeated = false;
+        this.minimapDirty = true;
     }
 
     generate() {
@@ -442,7 +443,10 @@ export class Map {
                     const dx = x - tx;
                     const dy = y - ty;
                     if (dx * dx + dy * dy <= radius * radius) {
-                        this.exploredTiles[y][x] = true;
+                        if (!this.exploredTiles[y][x]) {
+                            this.exploredTiles[y][x] = true;
+                            this.minimapDirty = true;
+                        }
                     }
                 }
             }

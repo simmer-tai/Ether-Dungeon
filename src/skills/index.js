@@ -107,6 +107,11 @@ export function createSkill(data) {
                 if (finalParams.minDamage !== undefined) finalParams.minDamage *= user.bloodDamageMultiplier;
                 if (finalParams.maxDamage !== undefined) finalParams.maxDamage *= user.bloodDamageMultiplier;
             }
+            if (data.element === 'poison' && user.poisonDamageMultiplier !== undefined) {
+                if (finalParams.damage !== undefined) finalParams.damage *= user.poisonDamageMultiplier;
+                if (finalParams.minDamage !== undefined) finalParams.minDamage *= user.poisonDamageMultiplier;
+                if (finalParams.maxDamage !== undefined) finalParams.maxDamage *= user.poisonDamageMultiplier;
+            }
 
             // Apply Critical Rate Bonus (Multiplicative / Percentage Increase)
             if (user.critRateBonus !== undefined && finalParams.critChance !== undefined) {

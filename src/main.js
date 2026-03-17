@@ -1,7 +1,7 @@
 import { InputHandler, Camera, Entity, getCachedImage, filterInPlace } from './utils.js';
 import { Map } from './map.js';
 import { Player } from './player.js';
-import { Enemy, Slime, Bat, Goblin, SkeletonArcher, Ghost, AetherSentinel, AetherPrime, Boss, Chest, Statue, BloodAltar, ShopNPC, WoodCrate, ScrapHeap, SpikeTrap, LabNPC, SkillPedestal } from './entities.js';
+import { Enemy, Slime, Bat, Goblin, SkeletonArcher, Ghost, AetherSentinel, AetherPrime, Boss, Chest, Statue, BloodAltar, ShopNPC, WoodCrate, ScrapHeap, SpikeTrap, LabNPC, SkillPedestal, TrainingDummy } from './entities.js';
 import { createSkill } from './skills/index.js';
 import { drawUI, showSkillSelection, hideSkillSelection, showBlessingSelection, hideBlessingSelection, drawDialogue, hideDialogue, initSettingsUI, initRankingUI, showNicknameInput, showStageSettings, hideStageSettings } from './ui.js';
 import { skillsDB } from '../data/skills_db.js';
@@ -255,16 +255,26 @@ class Game {
                 this.isDungeonStarting = false;
                 this.worldFadeAlpha = 0;
 
-                const titleScreen = document.getElementById('title-screen');
-                if (titleScreen) titleScreen.style.display = 'none';
+                this.showLoading();
 
-                // Re-init for Lobby (Floor 0), reusing existing sample map if appropriate 
-                // but usually better to re-init fresh for lobby.
-                this.init(false, 'normal', null, true);
+                // Small delay to allow browser to render the loading screen
+                setTimeout(async () => {
+                    const titleScreen = document.getElementById('title-screen');
+                    if (titleScreen) titleScreen.style.display = 'none';
 
-                // --- Cinematic Trigger (Short flash or zoom if desired) ---
-                this.targetCameraZoom = 1.0; 
-                this.isHUDVisible = true;
+                    // Ensure assets are preloaded before entering lobby
+                    await this.preloadAllAssets();
+
+                    // Re-init for Lobby (Floor 0), reusing existing sample map if appropriate 
+                    // but usually better to re-init fresh for lobby.
+                    this.init(false, 'normal', null, true);
+
+                    // --- Cinematic Trigger (Short flash or zoom if desired) ---
+                    this.targetCameraZoom = 1.0; 
+                    this.isHUDVisible = true;
+
+                    this.hideLoading();
+                }, 100);
             };
         }
 
@@ -314,8 +324,21 @@ class Game {
     showLoading() {
         const screen = document.getElementById('loading-screen');
         const fill = document.querySelector('.loading-bar-fill');
+        
+        // Clear any pending hide timeouts
+        if (this._loadingHideTimeout1) {
+            clearTimeout(this._loadingHideTimeout1);
+            this._loadingHideTimeout1 = null;
+        }
+        if (this._loadingHideTimeout2) {
+            clearTimeout(this._loadingHideTimeout2);
+            this._loadingHideTimeout2 = null;
+        }
+
         if (screen) {
             screen.style.display = 'flex';
+            screen.style.opacity = '1';
+            screen.style.animation = ''; // Reset fadeOutTitle animation
             if (fill) fill.style.width = '0%';
         }
     }
@@ -332,12 +355,18 @@ class Game {
         const fill = document.querySelector('.loading-bar-fill');
         if (fill) fill.style.width = '100%';
 
-        setTimeout(() => {
+        // Clear any previous timeouts to avoid overlapping transitions
+        if (this._loadingHideTimeout1) clearTimeout(this._loadingHideTimeout1);
+        if (this._loadingHideTimeout2) clearTimeout(this._loadingHideTimeout2);
+
+        this._loadingHideTimeout1 = setTimeout(() => {
             if (screen) {
                 screen.style.animation = 'fadeOutTitle 0.3s forwards';
-                setTimeout(() => {
+                this._loadingHideTimeout2 = setTimeout(() => {
                     screen.style.display = 'none';
                     screen.style.animation = '';
+                    this._loadingHideTimeout1 = null;
+                    this._loadingHideTimeout2 = null;
                 }, 300);
             }
         }, 300);
@@ -709,6 +738,13 @@ class Game {
                 this.labNPCs.push(new LabNPC(this, (startRoom.x + 2) * this.map.tileSize, (startRoom.y + startRoom.h - 3) * this.map.tileSize));
                 // Place Skill Pedestal (Bottom Right)
                 this.skillPedestals.push(new SkillPedestal(this, (startRoom.x + startRoom.w - 3) * this.map.tileSize, (startRoom.y + startRoom.h - 3) * this.map.tileSize));
+                
+                // --- Training Dummy (Center Area) ---
+                const dummyX = (startRoom.x + startRoom.w / 2) * this.map.tileSize;
+                const dummyY = (startRoom.y + 4) * this.map.tileSize; // Positioned for testing
+                this.enemies.push(new TrainingDummy(this, dummyX, dummyY));
+                this.enemies.push(new TrainingDummy(this, dummyX - 96, dummyY)); // Left dummy
+                this.enemies.push(new TrainingDummy(this, dummyX + 96, dummyY)); // Right dummy
             }
         }
 
@@ -998,6 +1034,44 @@ class Game {
         _debugLog(`Training Mode Started. Spawned ${this.enemies.length} Dummies.`);
     }
 
+    updateCamera(dt) {
+        if (!this.player || !this.camera) return;
+
+        // Frame-rate independent lerp factors
+        const zoomFactor = 1.0 - Math.exp(-3.0 * dt);
+        const offsetFactor = 1.0 - Math.exp(-5.0 * dt);
+
+        if (Math.abs(this.targetCameraZoom - this.cameraZoom) > 0.001) {
+            this.cameraZoom += (this.targetCameraZoom - this.cameraZoom) * zoomFactor;
+        } else {
+            this.cameraZoom = this.targetCameraZoom;
+        }
+
+        if (Math.abs(this.targetCameraOffsetX - this.cameraOffsetX) > 0.1) {
+            this.cameraOffsetX += (this.targetCameraOffsetX - this.cameraOffsetX) * offsetFactor;
+        } else {
+            this.cameraOffsetX = this.targetCameraOffsetX;
+        }
+
+        if (Math.abs(this.targetCameraOffsetY - this.cameraOffsetY) > 0.1) {
+            this.cameraOffsetY += (this.targetCameraOffsetY - this.cameraOffsetY) * offsetFactor;
+        } else {
+            this.cameraOffsetY = this.targetCameraOffsetY;
+        }
+
+        let finalOffsetX = this.cameraOffsetX;
+        let finalOffsetY = this.cameraOffsetY;
+
+        if (this.gameState === 'DIALOGUE') {
+            finalOffsetX += 115; // Maintain dialogue shift
+        }
+
+        const isCinematicTransition = this.targetCameraZoom !== 1.0 || this.targetCameraOffsetX !== 0;
+        const followSmoothness = isCinematicTransition ? 10 : 5;
+
+        this.camera.follow(this.player, dt, finalOffsetX, finalOffsetY, this.cameraZoom, followSmoothness);
+    }
+
     spawnDeathEffect(entity) {
         // 1. White Silhouette (Ghost)
         this.animations.push({
@@ -1055,46 +1129,15 @@ class Game {
             if (a.type === 'particle' || a.type === 'text') {
                 a.x += a.vx * dt;
                 a.y += a.vy * dt;
+                if (a.isDamageText) {
+                    a.vy += 450 * dt; // Gravity pulls the text down after the initial pop
+                }
             }
             if (a.update) a.update(dt);
         });
         filterInPlace(this.animations, a => a.life > 0);
 
-        // Interpolate Special Camera States
-        const zoomFactor = 3.0 * dt; // Doubled zoom speed (was 1.5)
-        const offsetFactor = 5.0 * dt; // Doubled movement speed (was 2.5)
-
-        if (Math.abs(this.targetCameraZoom - this.cameraZoom) > 0.001) {
-            this.cameraZoom += (this.targetCameraZoom - this.cameraZoom) * zoomFactor;
-        } else {
-            this.cameraZoom = this.targetCameraZoom;
-        }
-
-        if (Math.abs(this.targetCameraOffsetX - this.cameraOffsetX) > 0.1) {
-            this.cameraOffsetX += (this.targetCameraOffsetX - this.cameraOffsetX) * offsetFactor;
-        } else {
-            this.cameraOffsetX = this.targetCameraOffsetX;
-        }
-
-        if (Math.abs(this.targetCameraOffsetY - this.cameraOffsetY) > 0.1) {
-            this.cameraOffsetY += (this.targetCameraOffsetY - this.cameraOffsetY) * offsetFactor;
-        } else {
-            this.cameraOffsetY = this.targetCameraOffsetY;
-        }
-
-        // Consolidated Camera Update
-        let finalOffsetX = this.cameraOffsetX;
-        let finalOffsetY = this.cameraOffsetY;
-
-        if (this.gameState === 'DIALOGUE') {
-            finalOffsetX += 115; // Maintain dialogue shift
-        }
-
-        // Use higher smoothFactor for cinematic transitions to ensure linear path
-        const isCinematicTransition = this.targetCameraZoom !== 1.0 || this.targetCameraOffsetX !== 0;
-        const followSmoothness = isCinematicTransition ? 10 : 5;
-
-        this.camera.follow(this.player, dt, finalOffsetX, finalOffsetY, this.cameraZoom, followSmoothness);
+        // Camera updates have been moved to loop() to prevent physics stutter
 
         if (this.gameState === 'TITLE') {
             return;
@@ -1178,6 +1221,9 @@ class Game {
                 if (a.type === 'particle' || a.type === 'text') {
                     a.x += a.vx * dt;
                     a.y += a.vy * dt;
+                    if (a.isDamageText) {
+                        a.vy += 450 * dt; // Gravity pulls the text down
+                    }
                 }
                 if (a.update) a.update(dt);
             });
@@ -1457,7 +1503,7 @@ class Game {
                 this.stairPromptX = cx;
                 this.stairPromptY = cy;
 
-                if (this.input.isDown('KeyF') && this.interactCooldown <= 0) {
+                if (this.input.isDown('Space') && this.interactCooldown <= 0) {
                     this.interactCooldown = 0.5;
                     this.logToScreen("Entering Portal Animation...");
                     this.isTransitioning = true;
@@ -1508,8 +1554,8 @@ class Game {
                 this.currentInteractable.showPrompt = true;
             }
 
-            // Global F key for interaction
-            if (this.input.isDown('KeyF') && this.interactCooldown <= 0) {
+            // Global Space key for interaction
+            if (this.input.isDown('Space') && this.interactCooldown <= 0) {
                 this.interactCooldown = 0.3; // Prevent double-trigger
                 if (this.currentInteractable.interact) {
                     this.currentInteractable.interact();
@@ -1550,7 +1596,7 @@ class Game {
 
         this.bloodAltars.forEach(altar => altar.update(dt));
 
-        if (!this.input.isDown('KeyF')) this.input.spacePressed = false;
+        if (!this.input.isDown('Space')) this.input.spacePressed = false;
 
         // Portal Particles (Stairs)
         const stairRoom = this.map.rooms.find(r => r.type === 'staircase');
@@ -1758,32 +1804,29 @@ class Game {
 
 
 
-    drawProjectile(p) {
+    drawProjectile(p, alpha = 1) {
         if (p.draw) {
             this.ctx.save();
-            p.draw(this.ctx);
+            p.draw(this.ctx, alpha, this); // Added 'this' for game context if needed
             this.ctx.restore();
             return;
         }
 
-        if (p.draw) {
-            p.draw(this.ctx);
-            return;
-        }
-
         let drawn = false;
+        const interpX = p.prevX !== undefined ? p.prevX + (p.x - p.prevX) * alpha : p.x;
+        const interpY = p.prevY !== undefined ? p.prevY + (p.y - p.prevY) * alpha : p.y;
 
         this.ctx.save();
         // Fade out in the last 30% of life, or if no maxLife, standard
-        let alpha = 1;
+        let drawAlpha = 1;
         if (p.maxLife) {
             // Fade out when life < 30% of maxLife
             const fadeThreshold = p.maxLife * 0.3;
             if (p.life < fadeThreshold) {
-                alpha = p.life / fadeThreshold;
+                drawAlpha = p.life / fadeThreshold;
             }
         }
-        this.ctx.globalAlpha = alpha;
+        this.ctx.globalAlpha = drawAlpha;
 
         this.ctx.fillStyle = p.color;
         if (p.image) {
@@ -1876,23 +1919,25 @@ class Game {
                         this.ctx.beginPath();
                         if (p.w > p.h) {
                             if (p.vx > 0) { // Right
-                                this.ctx.moveTo(Math.floor(p.x) + j(), Math.floor(p.y) + j());
-                                this.ctx.lineTo(Math.floor(p.x + p.w) + j(), Math.floor(p.y + p.h / 2) + j());
-                                this.ctx.lineTo(Math.floor(p.x) + j(), Math.floor(p.y + p.h) + j());
+                                this.ctx.moveTo(p.x + j(), p.y + j());
+                                this.ctx.lineTo(p.x + p.w + j(), p.y + p.h / 2 + j());
+                                this.ctx.lineTo(p.x + j(), p.y + p.h + j());
                             } else { // Left
-                                this.ctx.moveTo(Math.floor(p.x) + j(), Math.floor(p.y + p.h / 2) + j());
-                                this.ctx.lineTo(Math.floor(p.x + p.w) + j(), Math.floor(p.y) + j());
-                                this.ctx.lineTo(Math.floor(p.x + p.w) + j(), Math.floor(p.y + p.h) + j());
+                                this.ctx.moveTo(interpX + j(), interpY + p.h / 2 + j());
+                                this.ctx.lineTo(interpX + p.w + j(), interpY + j());
+                                this.ctx.lineTo(interpX + p.w + j(), interpY + p.h + j());
                             }
                         } else {
-                            if (p.vy > 0) { // Down
-                                this.ctx.moveTo(Math.floor(p.x) + j(), Math.floor(p.y) + j());
-                                this.ctx.lineTo(Math.floor(p.x + p.w / 2) + j(), Math.floor(p.y + p.h) + j());
-                                this.ctx.lineTo(Math.floor(p.x + p.w) + j(), Math.floor(p.y) + j());
+                            const j = () => (Math.random() - 0.5) * 5;
+                            this.ctx.beginPath();
+                            if (Math.random() > 0.5) { // Down
+                                this.ctx.moveTo(interpX + j(), interpY + j());
+                                this.ctx.lineTo(interpX + p.w / 2 + j(), interpY + p.h + j());
+                                this.ctx.lineTo(interpX + p.w + j(), interpY + j());
                             } else { // Up
-                                this.ctx.moveTo(Math.floor(p.x) + j(), Math.floor(p.y + p.h) + j());
-                                this.ctx.lineTo(Math.floor(p.x + p.w / 2) + j(), Math.floor(p.y) + j());
-                                this.ctx.lineTo(Math.floor(p.x + p.w) + j(), Math.floor(p.y + p.h) + j());
+                                this.ctx.moveTo(interpX + j(), interpY + p.h + j());
+                                this.ctx.lineTo(interpX + p.w / 2 + j(), interpY + j());
+                                this.ctx.lineTo(interpX + p.w + j(), interpY + p.h + j());
                             }
                         }
                         this.ctx.fill();
@@ -1901,8 +1946,8 @@ class Game {
 
                 } else if (p.shape === 'slash') {
                     // Slash (Procedural Crescent/Wind Blade with Swipe Animation)
-                    const cx = p.x + p.w / 2;
-                    const cy = p.y + p.h / 2;
+                    const cx = interpX + p.w / 2;
+                    const cy = interpY + p.h / 2;
                     const angle = p.rotation !== undefined ? p.rotation : Math.atan2(p.vy, p.vx);
 
                     this.ctx.save();
@@ -1971,8 +2016,8 @@ class Game {
 
                 } else if (p.shape === 'orb') {
                     // Orb (World Coords)
-                    const cx = p.x + p.w / 2;
-                    const cy = p.y + p.h / 2;
+                    const cx = interpX + p.w / 2;
+                    const cy = interpY + p.h / 2;
                     const radius = p.w / 2;
 
                     this.ctx.save();
@@ -1988,9 +2033,9 @@ class Game {
                 } else {
                     // Default Rectangle (Centered for Rotation)
                     this.ctx.save();
-                    this.ctx.translate(p.x + p.w / 2, p.y + p.h / 2);
+                    this.ctx.translate(interpX + p.w / 2, interpY + p.h / 2);
                     this.ctx.rotate((p.rotation || 0) * Math.PI / 180);
-                    if (p.alpha !== undefined) this.ctx.globalAlpha = p.alpha;
+                    if (p.drawAlpha !== undefined) this.ctx.globalAlpha = p.drawAlpha;
                     this.ctx.fillStyle = p.color;
                     this.ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
                     this.ctx.restore();
@@ -2000,13 +2045,15 @@ class Game {
         this.ctx.restore();
     }
 
-    draw() {
+    draw(alpha = 1) {
         this.ctx.clearRect(0, 0, this.width, this.height);
 
         if (!this.camera || !this.player) return;
 
         // --- Camera Space ---
         this.ctx.save();
+        // Use true for interpolation-based smooth movement
+        this.ctx.imageSmoothingEnabled = true;
 
         // Base Zoom * Cinematic Zoom
         const finalZoom = this.zoom * this.camera.zoom;
@@ -2037,8 +2084,10 @@ class Game {
         // Draw 'bottom' layer projectiles (Ice Garden Spikes)
         this.projectiles.forEach(p => {
             if (p.layer === 'bottom' && p.active !== false) {
-                if (!this.camera.isVisible(p.x, p.y, p.w || 10, p.h || 10)) return;
-                this.drawProjectile(p);
+                const interpX = p.prevX !== undefined ? p.prevX + (p.x - p.prevX) * alpha : p.x;
+                const interpY = p.prevY !== undefined ? p.prevY + (p.y - p.prevY) * alpha : p.y;
+                if (!this.camera.isVisible(interpX, interpY, p.w || 10, p.h || 10)) return;
+                this.drawProjectile(p, alpha);
             }
         });
 
@@ -2061,7 +2110,8 @@ class Game {
         for (const chest of this.chests) {
             if (this.camera.isVisible(chest.x, chest.y, chest.width, chest.height)) {
                 const item = getRenderItem();
-                item.entity = chest; item.type = 1; item.z = chest.y + chest.height;
+                const interpY = chest.prevY + (chest.y - chest.prevY) * alpha;
+                item.entity = chest; item.type = 1; item.z = interpY + chest.height;
             }
         }
 
@@ -2069,7 +2119,8 @@ class Game {
         for (const statue of this.statues) {
             if (this.camera.isVisible(statue.x, statue.y, statue.width, statue.height)) {
                 const item = getRenderItem();
-                item.entity = statue; item.type = 2; item.z = statue.y + statue.height;
+                const interpY = statue.prevY + (statue.y - statue.prevY) * alpha;
+                item.entity = statue; item.type = 2; item.z = interpY + statue.height;
             }
         }
 
@@ -2077,7 +2128,8 @@ class Game {
         for (const altar of this.bloodAltars) {
             if (this.camera.isVisible(altar.x, altar.y, altar.width, altar.height)) {
                 const item = getRenderItem();
-                item.entity = altar; item.type = 3; item.z = altar.y + altar.height;
+                const interpY = altar.prevY + (altar.y - altar.prevY) * alpha;
+                item.entity = altar; item.type = 3; item.z = interpY + altar.height;
             }
         }
 
@@ -2085,7 +2137,8 @@ class Game {
         for (const npc of this.shopNPCs) {
             if (this.camera.isVisible(npc.x, npc.y, npc.width, npc.height)) {
                 const item = getRenderItem();
-                item.entity = npc; item.type = 4; item.z = npc.y + npc.height;
+                const interpY = npc.prevY + (npc.y - npc.prevY) * alpha;
+                item.entity = npc; item.type = 4; item.z = interpY + npc.height;
             }
         }
 
@@ -2093,26 +2146,30 @@ class Game {
         for (const npc of this.labNPCs) {
             if (this.camera.isVisible(npc.x, npc.y, npc.width, npc.height)) {
                 const item = getRenderItem();
-                item.entity = npc; item.type = 4; item.z = npc.y + npc.height;
+                const interpY = npc.prevY + (npc.y - npc.prevY) * alpha;
+                item.entity = npc; item.type = 4; item.z = interpY + npc.height;
             }
         }
 
         for (const p of this.skillPedestals) {
             if (this.camera.isVisible(p.x, p.y, p.width, p.height)) {
                 const item = getRenderItem();
-                item.entity = p; item.type = 4; item.z = p.y + p.height;
+                const interpY = p.prevY + (p.y - p.prevY) * alpha;
+                item.entity = p; item.type = 4; item.z = interpY + p.height;
             }
         }
 
         // 2. Player
         const pItem = getRenderItem();
-        pItem.entity = this.player; pItem.type = 5; pItem.z = this.player.y + this.player.height;
+        const pInterpY = this.player.prevY + (this.player.y - this.player.prevY) * alpha;
+        pItem.entity = this.player; pItem.type = 5; pItem.z = pInterpY + this.player.height;
 
         // 3. Enemies
         for (const enemy of this.enemies) {
             if (this.camera.isVisible(enemy.x, enemy.y, enemy.width, enemy.height)) {
                 const item = getRenderItem();
-                item.entity = enemy; item.type = 6; item.z = enemy.y + enemy.height;
+                const interpY = enemy.prevY + (enemy.y - enemy.prevY) * alpha;
+                item.entity = enemy; item.type = 6; item.z = interpY + enemy.height;
             }
         }
 
@@ -2120,7 +2177,8 @@ class Game {
         for (const entity of this.entities) {
             if (this.camera.isVisible(entity.x, entity.y, entity.width, entity.height)) {
                 const item = getRenderItem();
-                item.entity = entity; item.type = 7; item.z = entity.y + entity.height;
+                const interpY = entity.prevY + (entity.y - entity.prevY) * alpha;
+                item.entity = entity; item.type = 7; item.z = interpY + entity.height;
             }
         }
 
@@ -2145,42 +2203,44 @@ class Game {
         activeList.sort((a, b) => a.z - b.z);
 
         // Draw All based on type
-        for (let i = 0; i < renderIndex; i++) {
-            const item = renderList[i];
+        for (let i = 0; i < activeList.length; i++) {
+            const item = activeList[i];
             const e = item.entity;
             switch (item.type) {
                 case 1: // Chest
-                    e.draw(this.ctx);
+                    e.draw(this.ctx, alpha);
                     if (e.showPrompt) {
                         this.ctx.fillStyle = 'white';
                         this.ctx.font = "14px 'Meiryo', sans-serif";
                         this.ctx.textAlign = 'center';
-                        this.ctx.fillText("[SPACE] 開く", e.x + e.width / 2, e.y - 10);
+                        const interpX = e.prevX + (e.x - e.prevX) * alpha;
+                        const interpY = e.prevY + (e.y - e.prevY) * alpha;
+                        this.ctx.fillText("[SPACE] 開く", interpX + e.width / 2, interpY - 10);
                     }
                     break;
                 case 2: // Statue
-                    e.draw(this.ctx);
+                    e.draw(this.ctx, alpha);
                     break;
                 case 3: // Altar
-                    e.draw(this.ctx);
+                    e.draw(this.ctx, alpha);
                     break;
                 case 4: // Shop NPC
-                    e.draw(this.ctx);
+                    e.draw(this.ctx, alpha);
                     break;
                 case 5: // Player
-                    e.draw(this.ctx);
+                    e.draw(this.ctx, alpha);
                     break;
                 case 6: // Enemy
-                    e.draw(this.ctx);
+                    e.draw(this.ctx, alpha);
                     break;
                 case 7: // Generic Entity
-                    e.draw(this.ctx);
+                    e.draw(this.ctx, alpha);
                     break;
                 case 8: // Projectile
-                    this.drawProjectile(e);
+                    this.drawProjectile(e, alpha);
                     break;
                 case 9: // Enemy Projectile
-                    e.draw(this.ctx);
+                    e.draw(this.ctx, alpha);
                     break;
             }
         }
@@ -2314,12 +2374,72 @@ class Game {
                 this.ctx.arc(a.x, a.y, currentRadius, 0, Math.PI * 2);
                 this.ctx.stroke();
             } else if (a.type === 'text') {
-                this.ctx.font = a.font || "16px 'Meiryo', 'Hiragino Kaku Gothic ProN', 'MS PGothic', sans-serif";
+                this.ctx.save();
+                
+                let scale = 1.0;
+                let alpha = 1.0;
+                
+                if (a.isDamageText) {
+                    const progress = 1 - (a.life / a.maxLife); // 0 to 1
+                    if (progress < 0.25) {
+                        // First 25%: pop up and scale from 0.5 to 1.5
+                        const p2 = progress / 0.25;
+                        scale = 0.5 + (1.0 * Math.sin(p2 * Math.PI / 2));
+                        alpha = 1.0;
+                    } else {
+                        // Remaining 75%: scale down from 1.5 to 0.7 and fade out RAPIDLY
+                        const p2 = (progress - 0.25) / 0.75;
+                        scale = 1.5 - (p2 * 0.8);
+                        // Make alpha drop much faster (cubic falloff)
+                        alpha = 1.0 - (p2 * p2 * p2); 
+                    }
+                } else {
+                    alpha = Math.min(1.0, a.life / (a.maxLife * 0.5)); // Fade out in the last 50% of life
+                }
+
+                this.ctx.globalAlpha = Math.max(0, alpha);
+                this.ctx.font = a.font || "16px sans-serif";
                 this.ctx.fillStyle = a.color || 'white';
                 this.ctx.strokeStyle = 'black';
                 this.ctx.lineWidth = 2;
-                this.ctx.strokeText(a.text, a.x, a.y);
-                this.ctx.fillText(a.text, a.x, a.y);
+                this.ctx.textAlign = 'left';
+                this.ctx.textBaseline = 'middle';
+                
+                const textWidth = this.ctx.measureText(a.text).width;
+                const iconSize = a.iconSize || 22;
+                const spacing = 4;
+                let iconsTotalWidth = 0;
+                
+                const validIcons = (a.icons || []).filter(icon => icon && icon.complete && icon.naturalWidth !== 0);
+                if (validIcons.length > 0) {
+                    iconsTotalWidth = validIcons.length * (iconSize + spacing) - spacing;
+                }
+                
+                const totalWidth = textWidth + (iconsTotalWidth > 0 ? spacing + iconsTotalWidth : 0);
+                
+                // If we need to scale, we must translate to the center first
+                if (scale !== 1.0) {
+                    this.ctx.translate(a.x, a.y);
+                    this.ctx.scale(scale, scale);
+                    this.ctx.translate(-a.x, -a.y);
+                }
+
+                const startX = Math.floor(a.x - totalWidth / 2);
+                const drawY = Math.floor(a.y);
+
+                // Draw Shadow/Stroke for better readability
+                this.ctx.strokeText(a.text, startX, drawY);
+                this.ctx.fillText(a.text, startX, drawY);
+
+                // Draw Icons if provided
+                if (validIcons.length > 0) {
+                    let currentIconX = startX + textWidth + spacing;
+                    for (const icon of validIcons) {
+                        this.ctx.drawImage(icon, Math.floor(currentIconX), Math.floor(drawY - iconSize / 2), iconSize, iconSize);
+                        currentIconX += iconSize + spacing;
+                    }
+                }
+                this.ctx.restore();
             } else if (a.type === 'visual_projectile') {
                 this.ctx.fillStyle = a.color;
                 if (a.image && a.image.complete && a.image.naturalWidth !== 0) {
@@ -2348,6 +2468,48 @@ class Game {
                         if (destH > a.h) { destH = a.h; destW = destH * ratio; }
                     }
                     this.ctx.drawImage(a.image, sx, sy, sw, sh, -destW / 2, -destH / 2, destW, destH);
+                    this.ctx.restore();
+                }
+            } else if (a.type === 'lightning_bolt') {
+                const x1 = a.x1;
+                const y1 = a.y1;
+                const x2 = a.x2;
+                const y2 = a.y2;
+                
+                const dx = x2 - x1;
+                const dy = y2 - y1;
+                const dist = Math.hypot(dx, dy);
+                if (dist > 0) {
+                    const segments = Math.max(2, Math.floor(dist / 12));
+                    this.ctx.save();
+                    this.ctx.strokeStyle = a.color || '#ffff00';
+                    this.ctx.lineWidth = a.width || 2;
+                    this.ctx.globalAlpha = Math.min(1.0, (a.life / a.maxLife) * 2); // Stay bright then fade
+                    
+                    this.ctx.shadowBlur = 8;
+                    this.ctx.shadowColor = a.color || '#ffff00';
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x1, y1);
+                    
+                    const vx = -(y2 - y1) / dist;
+                    const vy = (x2 - x1) / dist;
+                    
+                    for (let i = 1; i < segments; i++) {
+                        const t = i / segments;
+                        const px = x1 + (x2 - x1) * t;
+                        const py = y1 + (y2 - y1) * t;
+                        const jitter = (Math.random() - 0.5) * 15;
+                        this.ctx.lineTo(px + vx * jitter, py + vy * jitter);
+                    }
+                    
+                    this.ctx.lineTo(x2, y2);
+                    this.ctx.stroke();
+                    
+                    // White core
+                    this.ctx.strokeStyle = '#ffffff';
+                    this.ctx.lineWidth = this.ctx.lineWidth / 2;
+                    this.ctx.stroke();
                     this.ctx.restore();
                 }
             } else {
@@ -2487,6 +2649,11 @@ class Game {
     }
 
     loop(timestamp) {
+        if (!this.player || !this.camera) {
+            requestAnimationFrame(this.loop);
+            return;
+        }
+
         let deltaTime = (timestamp - this.lastTime) / 1000;
         this.lastTime = timestamp;
         if (deltaTime > 0.25) deltaTime = 0.25;
@@ -2548,16 +2715,42 @@ class Game {
 
         // Prevent infinite loop if step size is too close to zero
         if (activeStep > 0.0001) {
-            while (this.accumulator >= activeStep) {
+            let updateMax = 10;
+            while (this.accumulator >= activeStep && updateMax > 0) {
+                // Save previous positions for all entities before update
+                this.player.savePrevPos();
+                this.enemies.forEach(e => e.savePrevPos());
+                this.entities.forEach(e => e.savePrevPos());
+                this.projectiles.forEach(p => p.savePrevPos && p.savePrevPos());
+                this.enemyProjectiles.forEach(p => p.savePrevPos && p.savePrevPos());
+                if (this.traps) this.traps.forEach(t => t.savePrevPos());
+
                 this.update(activeStep);
                 this.accumulator -= activeStep;
+                updateMax--;
+            }
+            if (updateMax === 0) {
+                this.accumulator = 0;
             }
         } else {
             // Time is stopped (0.0 scale)
             // Accumulator just holds pending time until scale increases
         }
 
-        this.draw();
+        // Calculate interpolation alpha (0.0 to 1.0)
+        const alpha = activeStep > 0 ? this.accumulator / activeStep : 0;
+
+        // --- Interpolated Camera Update ---
+        // We follow a virtual position for the player that is interpolated
+        const interpPlayer = {
+            x: this.player.prevX + (this.player.x - this.player.prevX) * alpha,
+            y: this.player.prevY + (this.player.y - this.player.prevY) * alpha,
+            width: this.player.width,
+            height: this.player.height
+        };
+        this.updateCamera(deltaTime, interpPlayer);
+
+        this.draw(alpha);
         this.input.update();
         requestAnimationFrame(this.loop);
     }

@@ -68,7 +68,11 @@ export class Goblin extends Enemy {
         }
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
+        // Interpolated Position
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+
         ctx.save();
         // Selection of image based on state
         let currentImg = this.imgNormal;
@@ -90,7 +94,7 @@ export class Goblin extends Enemy {
         const spawnProgress = this.isSpawning ? (1 - (this.spawnTimer / this.spawnDuration)) : 1.0;
         const shadowAlpha = 0.3 * spawnProgress;
         ctx.save();
-        ctx.translate(this.x + this.width / 2, this.y + this.height);
+        ctx.translate(interpX + this.width / 2, interpY + this.height);
         ctx.scale(1, 0.5); // Oval
         ctx.fillStyle = 'rgba(0, 0, 0, ' + shadowAlpha + ')';
         ctx.beginPath();
@@ -113,7 +117,7 @@ export class Goblin extends Enemy {
             const faceLeft = this.game.player.x < this.x;
 
             // Draw matching height alignment with BaseEnemy's center-bottom logic
-            ctx.translate(this.x + this.width / 2, this.y + this.height);
+            ctx.translate(interpX + this.width / 2, interpY + this.height);
 
             if (faceLeft) {
                 ctx.scale(-1, 1);
@@ -138,7 +142,7 @@ export class Goblin extends Enemy {
             }
 
             // Center bottom alignment
-            ctx.translate(this.x + this.width / 2, this.y + this.height);
+            ctx.translate(interpX + this.width / 2, interpY + this.height);
             if (faceLeft) ctx.scale(-1, 1);
 
             if (this.flashTimer > 0) ctx.filter = 'brightness(0) invert(1)';
@@ -150,17 +154,17 @@ export class Goblin extends Enemy {
         ctx.restore(); // Restore main draw save
 
         // Draw extra UI like telegraph circles or HP bars
-        this.drawUI(ctx);
+        this.drawUI(ctx, interpX, interpY);
     }
 
     // Helper to draw UI elements since we are overriding draw
-    drawUI(ctx) {
+    drawUI(ctx, interpX, interpY) {
         // Draw Telegraph Indicator
         if (this.isTelegraphing) {
             ctx.save();
             ctx.beginPath();
             const attackRadius = 112; // 150 * 0.75 = 112.5
-            ctx.arc(this.x + this.width / 2, this.y + this.height / 2, attackRadius, 0, Math.PI * 2);
+            ctx.arc(interpX + this.width / 2, interpY + this.height / 2, attackRadius, 0, Math.PI * 2);
             ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
             ctx.lineWidth = 2;
             ctx.stroke();
@@ -168,7 +172,7 @@ export class Goblin extends Enemy {
             const progress = 1 - (this.telegraphTimer / this.telegraphDuration);
             const radius = Math.max(0, attackRadius * progress);
             ctx.beginPath();
-            ctx.arc(this.x + this.width / 2, this.y + this.height / 2, radius, 0, Math.PI * 2);
+            ctx.arc(interpX + this.width / 2, interpY + this.height / 2, radius, 0, Math.PI * 2);
             ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
             ctx.fill();
             ctx.restore();
@@ -176,11 +180,11 @@ export class Goblin extends Enemy {
 
         // Draw HP Bar
         if (this.hp < this.maxHp) {
-            const barY = Math.floor(this.y - 6);
+            const barY = interpY - 6;
             ctx.fillStyle = 'red';
-            ctx.fillRect(Math.floor(this.x), barY, this.width, 4);
+            ctx.fillRect(interpX, barY, this.width, 4);
             ctx.fillStyle = 'green';
-            ctx.fillRect(Math.floor(this.x), barY, this.width * (this.hp / this.maxHp), 4);
+            ctx.fillRect(interpX, barY, this.width * (this.hp / this.maxHp), 4);
 
             // Draw Name
             ctx.fillStyle = 'white';
@@ -188,7 +192,7 @@ export class Goblin extends Enemy {
             ctx.textAlign = 'center';
             ctx.shadowColor = 'black';
             ctx.shadowBlur = 4;
-            ctx.fillText(this.displayName, this.x + this.width / 2, barY - 4);
+            ctx.fillText(this.displayName, interpX + this.width / 2, barY - 4);
             ctx.shadowBlur = 0;
             ctx.textAlign = 'start';
         }

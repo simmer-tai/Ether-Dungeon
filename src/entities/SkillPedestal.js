@@ -13,9 +13,11 @@ export class SkillPedestal extends Entity {
         // Static
     }
 
-    draw(ctx) {
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
+    draw(ctx, alpha = 1) {
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+        const cx = interpX + this.width / 2;
+        const cy = interpY + this.height / 2;
 
         // Draw a technological pedestal
         ctx.save();
@@ -25,10 +27,10 @@ export class SkillPedestal extends Entity {
         ctx.strokeStyle = '#00ffff';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(this.x, this.y + this.height);
-        ctx.lineTo(this.x + this.width, this.y + this.height);
-        ctx.lineTo(this.x + this.width - 5, this.y + 10);
-        ctx.lineTo(this.x + 5, this.y + 10);
+        ctx.moveTo(interpX, interpY + this.height);
+        ctx.lineTo(interpX + this.width, interpY + this.height);
+        ctx.lineTo(interpX + this.width - 5, interpY + 10);
+        ctx.lineTo(interpX + 5, interpY + 10);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
@@ -39,15 +41,14 @@ export class SkillPedestal extends Entity {
         ctx.shadowBlur = 10 * glow;
         ctx.shadowColor = '#00ffff';
         ctx.beginPath();
-        ctx.arc(cx, this.y + 15, 8, 0, Math.PI * 2);
+        ctx.arc(cx, interpY + 15, 8, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
-
     }
 
     getInteractPrompt() {
-        return "[F] スキル選択";
+        return "[SPACE] スキル選択";
     }
 
     interact() {
@@ -60,18 +61,25 @@ export class SkillPedestal extends Entity {
             this.game,
             allSkills,
             (settings) => {
-                // Determine if we are in the lobby (Floor 0) or starting from scratch
-                if (this.game.floor === 0) {
-                    // Just update skills without re-init (teleport)
-                    this.game.updateStartingSkills(settings.skills);
-                } else {
-                    // Original behavior for non-lobby or explicit start
-                    this.game.init(false, settings.difficulty, settings.skills, true);
-                }
-                
-                // Hide title screen just in case (though it should be hidden)
-                const titleScreen = document.getElementById('title-screen');
-                if (titleScreen) titleScreen.style.display = 'none';
+                this.game.showLoading();
+
+                // Small delay to allow the loading screen to render
+                setTimeout(() => {
+                    // Determine if we are in the lobby (Floor 0) or starting from scratch
+                    if (this.game.floor === 0) {
+                        // Just update skills without re-init (teleport)
+                        this.game.updateStartingSkills(settings.skills);
+                    } else {
+                        // Original behavior for non-lobby or explicit start
+                        this.game.init(false, settings.difficulty, settings.skills, true);
+                    }
+                    
+                    // Hide title screen just in case (though it should be hidden)
+                    const titleScreen = document.getElementById('title-screen');
+                    if (titleScreen) titleScreen.style.display = 'none';
+
+                    this.game.hideLoading();
+                }, 100);
             },
             () => {
                 // Return to lobby (do nothing)

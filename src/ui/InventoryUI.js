@@ -20,6 +20,7 @@ export class InventoryUI {
         this.focusName = document.getElementById('inventory-selected-name');
         this.focusType = document.getElementById('inventory-selected-type');
         this.focusDesc = document.getElementById('inventory-selected-desc');
+        this.statContainer = document.getElementById('inventory-selected-stats');
 
         // Stats
         this.statCooldown = document.getElementById('stat-cooldown');
@@ -41,7 +42,9 @@ export class InventoryUI {
         if (this._bound) return;
         this._bound = true;
 
-        this.btnClose.addEventListener('click', () => this.close());
+        if (this.btnClose) {
+            this.btnClose.addEventListener('click', () => this.close());
+        }
 
         this.filters.forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -128,6 +131,8 @@ export class InventoryUI {
         const eqIds = eqSkills.map(s => s.id);
 
         inventory.forEach(skill => {
+            if (!skill) return; // Skip null skills if any
+
             // Apply filter based on currentFilter (which can be a slotKey or a skill type)
             if (this.currentFilter === 'primary1' || this.currentFilter === 'primary2') {
                 if (skill.type !== SkillType.PRIMARY) return;
@@ -164,26 +169,31 @@ export class InventoryUI {
             });
 
             item.addEventListener('click', () => {
-                if (this.selectedSlot) {
-                    // Equip directly to the slot we opened this for
-                    if (skill.type === SkillType.PRIMARY && !this.selectedSlot.startsWith('primary')) {
-                        // Cannot equip primary to secondary slot, etc
-                    } else if (skill.type !== SkillType.PRIMARY && skill.type !== this.selectedSlot) {
-                        // Type mismatch
-                    } else {
-                        this.game.player.equipSkill(skill, this.selectedSlot);
-                        // Removed this.close() to keep inventory open
-                        this.renderBackpack();
-                        this.updateFocusArea();
-                    }
+                const isEquippedIn = Object.keys(this.game.player.equippedSkills).find(
+                    slot => this.game.player.equippedSkills[slot] && this.game.player.equippedSkills[slot].id === skill.id
+                );
+
+                if (isEquippedIn) {
+                    // Toggle Off
+                    this.game.player.unequipSkill(isEquippedIn);
                 } else {
-                    // Fallback to auto-equip behavior if opened without a specific slot
-                    if (!eqIds.includes(skill.id)) {
-                        this.game.player.equipSkill(skill, skill.type);
-                        this.renderBackpack();
-                        this.updateFocusArea();
+                    // Toggle On
+                    let targetSlot = this.selectedSlot || skill.type;
+                    
+                    // Logic to ensure correct slot for PRIMARY
+                    if (skill.type === SkillType.PRIMARY) {
+                        if (!targetSlot || !targetSlot.startsWith('primary')) {
+                           targetSlot = !this.game.player.equippedSkills['primary1'] ? 'primary1' : 'primary2';
+                        }
+                    } else {
+                        targetSlot = skill.type;
                     }
+                    
+                    this.game.player.equipSkill(skill, targetSlot);
                 }
+                
+                this.renderBackpack();
+                this.updateFocusArea();
             });
 
             this.backpackGrid.appendChild(item);
@@ -197,14 +207,13 @@ export class InventoryUI {
             this.focusType.textContent = '-';
             this.focusDesc.textContent = '';
 
-            // Stats Reset
-            this.statCooldown.textContent = '-';
-            this.statCritRate.textContent = '-';
-            this.statCritMult.textContent = '-';
-            this.statStatusRate.textContent = '-';
+            // Stats Hide
+            if (this.statContainer) this.statContainer.style.display = 'none';
             return;
         }
 
+        // Stats Show
+        if (this.statContainer) this.statContainer.style.display = 'flex';
         this.focusName.textContent = this.selectedSkill.name;
         this.focusName.style.color = '#ffd700';
 

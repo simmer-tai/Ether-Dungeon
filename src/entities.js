@@ -17,3 +17,4 @@ export { AetherSentinel } from './enemies/AetherSentinel.js';
 export { AetherPrime } from './enemies/AetherPrime.js';
 export { LabNPC } from './entities/LabNPC.js';
 export { SkillPedestal } from './entities/SkillPedestal.js';
+export { TrainingDummy } from './enemies/BaseEnemy.js';

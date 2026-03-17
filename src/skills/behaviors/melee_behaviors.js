@@ -62,6 +62,40 @@ export const meleeBehaviors = {
         });
     },
 
+    'venom_strike': (user, game, params) => {
+        const range = params.range || 60;
+        const hit = user.getHitBox(range, range * 1.5, range * 1.5);
+        
+        // Slash visual (Purple)
+        game.animations.push({
+            type: 'slash',
+            x: user.x + user.width / 2,
+            y: user.y,
+            radius: range,
+            startAngle: -Math.PI/4,
+            endAngle: Math.PI/4,
+            life: 0.2,
+            maxLife: 0.2,
+            color: '#800080'
+        });
+
+        game.enemies.forEach(enemy => {
+            if (hit.x < enemy.x + enemy.width && hit.x + hit.w > enemy.x &&
+                hit.y < enemy.y + enemy.height && hit.y + hit.h > enemy.y) {
+                
+                const isCrit = params.critChance > 0 && Math.random() < params.critChance;
+                const critMult = (params.critMultiplier || 1.8) + user.critDamageBonus;
+                const finalDamage = isCrit ? params.damage * critMult : params.damage;
+
+                enemy.takeDamage(finalDamage, '#800080', params.aetherCharge, isCrit);
+                if (enemy.statusManager) {
+                    enemy.statusManager.applyStatus('poison', 10.0, null, 20); // Longer duration, higher max stacks
+                }
+                game.spawnParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, 8, '#BF40BF');
+            }
+        });
+    },
+
     'spiral_out': (user, game, params) => {
         const center = { x: user.x + user.width / 2, y: user.y };
         const count = params.count || 8;

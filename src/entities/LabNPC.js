@@ -12,25 +12,24 @@ export class LabNPC extends Entity {
         // NPC is static
     }
 
-    draw(ctx) {
-        const cx = this.x + this.width / 2;
-        const cy = this.y + this.height / 2;
+    draw(ctx, alpha = 1) {
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
 
         if (this.image && this.image.complete && this.image.naturalWidth !== 0) {
             ctx.save();
             // Optional: Filter to distinguish from Shop NPC
             ctx.filter = 'hue-rotate(180deg)'; 
-            ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+            ctx.drawImage(this.image, interpX, interpY, this.width, this.height);
             ctx.restore();
         } else {
             ctx.fillStyle = this.color;
-            ctx.fillRect(this.x, this.y, this.width, this.height);
+            ctx.fillRect(interpX, interpY, this.width, this.height);
         }
-
     }
 
     getInteractPrompt() {
-        return "[F] アップグレード";
+        return "[SPACE] アップグレード";
     }
 
     interact() {

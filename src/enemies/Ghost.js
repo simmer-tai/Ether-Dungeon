@@ -107,9 +107,13 @@ export class Ghost extends Enemy {
         }
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
         if (this.image.complete && this.image.naturalWidth !== 0) {
             ctx.save();
+
+            // Interpolated Position
+            const interpX = this.prevX + (this.x - this.prevX) * alpha;
+            const interpY = this.prevY + (this.y - this.prevY) * alpha;
 
             // Spectral transparency pulse
             const pulse = 0.4 + Math.sin(this.floatPhase) * 0.1;
@@ -119,7 +123,7 @@ export class Ghost extends Enemy {
             const offsetY = Math.sin(this.floatPhase) * 8;
 
             // Centered bottom alignment logic
-            ctx.translate(this.x + this.width / 2, this.y + this.height + offsetY);
+            ctx.translate(interpX + this.width / 2, interpY + this.height + offsetY);
 
             // Ghostly tint/glow
             if (this.flashTimer > 0) {
@@ -152,27 +156,27 @@ export class Ghost extends Enemy {
             ctx.restore();
 
             // BaseEnemy's UI (HP Bar)
-            this.drawHPBar(ctx);
+            this.drawHPBar(ctx, interpX, interpY);
         } else {
-            super.draw(ctx);
+            super.draw(ctx, alpha);
         }
     }
 
     // Helper to draw HP bar since we override draw
-    drawHPBar(ctx) {
+    drawHPBar(ctx, interpX, interpY) {
         if (this.hp < this.maxHp) {
-            const barY = Math.floor(this.y - 12);
+            const barY = interpY - 12;
             ctx.fillStyle = 'red';
-            ctx.fillRect(Math.floor(this.x), barY, this.width, 4);
+            ctx.fillRect(interpX, barY, this.width, 4);
             ctx.fillStyle = 'green';
-            ctx.fillRect(Math.floor(this.x), barY, this.width * (this.hp / this.maxHp), 4);
+            ctx.fillRect(interpX, barY, this.width * (this.hp / this.maxHp), 4);
 
             ctx.fillStyle = 'white';
             ctx.font = 'bold 10px sans-serif';
             ctx.textAlign = 'center';
             ctx.shadowColor = 'black';
             ctx.shadowBlur = 4;
-            ctx.fillText(this.displayName, this.x + this.width / 2, barY - 4);
+            ctx.fillText(this.displayName, interpX + this.width / 2, barY - 4);
             ctx.shadowBlur = 0;
             ctx.textAlign = 'start';
         }

@@ -1,3 +1,5 @@
+import { CONFIG } from './config.js';
+
 export class InputHandler {
     constructor() {
         this.keys = {};
@@ -71,6 +73,8 @@ export class Camera {
         this.height = height;
         this.mapWidth = mapWidth;
         this.mapHeight = mapHeight;
+        this.baseX = 0;
+        this.baseY = 0;
         this.x = 0;
         this.y = 0;
         this.zoom = 1.0;
@@ -106,18 +110,24 @@ export class Camera {
         let targetY = target.y + target.height / 2 - viewH / 2 + offsetY;
 
         if (dt) {
-            const factor = smoothFactor * dt; // Smoothing factor
-            this.x += (targetX - this.x) * factor;
-            this.y += (targetY - this.y) * factor;
+            const factor = 1.0 - Math.exp(-smoothFactor * dt); // Frame-rate independent smoothing
+            this.baseX += (targetX - this.baseX) * factor;
+            this.baseY += (targetY - this.baseY) * factor;
         } else {
-            this.x = targetX;
-            this.y = targetY;
+            this.baseX = targetX;
+            this.baseY = targetY;
         }
 
-        // Apply Shake
+        // Apply Shake Offset
+        let shakeDX = 0;
+        let shakeDY = 0;
+        
         if (this.shakeTimer > 0) {
-            this.x += (Math.random() - 0.5) * this.shakeIntensity * 2;
-            this.y += (Math.random() - 0.5) * this.shakeIntensity * 2;
+            // Use time-based sine waves for smooth but fast rumble, avoiding single-frame random static noise
+            // that causes visual stuttering when imageSmoothing is enabled.
+            const time = Date.now() / 1000;
+            shakeDX = Math.sin(time * 45) * this.shakeIntensity;
+            shakeDY = Math.cos(time * 55) * this.shakeIntensity;
 
             this.shakeTimer -= dt;
             if (this.shakeTimer <= 0) {
@@ -126,8 +136,13 @@ export class Camera {
             }
         }
 
-        this.x = Math.max(0, Math.min(this.x, this.mapWidth - viewW));
-        this.y = Math.max(0, Math.min(this.y, this.mapHeight - viewH));
+        // Keep base coordinates inside map bounds
+        this.baseX = Math.max(0, Math.min(this.baseX, this.mapWidth - viewW));
+        this.baseY = Math.max(0, Math.min(this.baseY, this.mapHeight - viewH));
+
+        // Final output coordinates (with shake applied)
+        this.x = this.baseX + shakeDX;
+        this.y = this.baseY + shakeDY;
     }
 }
 
@@ -137,6 +152,8 @@ export class Entity {
         this.game = game;
         this.x = x;
         this.y = y;
+        this.prevX = x;
+        this.prevY = y;
         this.width = width;
         this.height = height;
         this.color = color;
@@ -154,6 +171,11 @@ export class Entity {
         this.knockbackVy = 0;
         this.knockbackDuration = 0;
         this.ignoreWalls = false;
+    }
+
+    savePrevPos() {
+        this.prevX = this.x;
+        this.prevY = this.y;
     }
 
     // Expose base update for children to bypass overrides
@@ -283,63 +305,74 @@ export class Entity {
     }
 
     takeDamage(amount, color = null, aetherAmount = 0, isCrit = false, kx = 0, ky = 0, kDuration = 0.2, silent = false, source = null) {
-        if (this.invulnerable > 0) return;
+        if (this.invulnerable > 0 || this.isCheatInvincible) return;
 
-        // Gambler's Dice Randomization (Player attacks)
-        if (this.game.player && this.game.player.circuit && this !== this.game.player) {
-            const gamblerRange = this.game.player.circuit.getBonuses().damageRandomRange || 0;
-            if (gamblerRange > 0) {
-                const multiplier = 1 + (Math.random() * 2 - 1) * gamblerRange;
-                amount *= multiplier;
-            }
+        // Apply global defense / reduction if available (Player only)
+        let finalDamage = amount;
+        if (this.takenDamageMultiplier !== undefined) {
+            finalDamage *= this.takenDamageMultiplier;
         }
 
-        let finalDamage = amount;
+        // Screen shake on hit
+        if (this.game.camera) this.game.camera.shake(0.2, 5);
 
         this.hp -= finalDamage;
-
-        // Apply knockback if provided
-        if (kx !== 0 || ky !== 0) {
-            this.knockbackVx = kx;
-            this.knockbackVy = ky;
-            this.knockbackDuration = kDuration;
+        if (this === this.game.player) {
+            this.invulnerable = CONFIG.PLAYER.INVULNERABLE_DURATION;
+        } else {
+            this.invulnerable = 0.5;
         }
 
         // Spawn Damage Text
         if (!silent) {
-            this.game.animations.push({
+            const anim = {
                 type: 'text',
+                isDamageText: true,
                 text: Math.ceil(finalDamage),
                 x: this.x + this.width / 2,
                 y: this.y,
-                vx: (Math.random() - 0.5) * 50,
-                vy: -100,
+                vx: (Math.random() - 0.5) * 150, // Increased horizontal spread
+                vy: -150, // More upward velocity specifically for the bounce
                 life: 0.8,
                 maxLife: 0.8,
-                color: this.damageColor,
-                font: "bold 20px 'Meiryo', sans-serif"
-            });
+                color: this.damageColor || '#ffffff',
+                font: "bold 20px 'Meiryo', sans-serif",
+                icons: []
+            };
+            this.game.animations.push(anim);
+            this.lastDamageAnim = anim;
         }
 
         if (this.hp <= 0) {
             this.hp = 0;
-            this.markedForDeletion = true;
+            if (this === this.game.player) {
+                if (!this.game.isGameOver) {
+                    this.game.isGameOver = true;
+                    this.game.gameState = 'GAME_OVER';
+                }
+            } else {
+                this.markedForDeletion = true;
+            }
         }
-        this.invulnerable = 0.5;
     }
 
-    draw(ctx) {
+    draw(ctx, alpha = 1) {
         ctx.fillStyle = this.color;
         if (this.invulnerable > 0 && Math.floor(Date.now() / 100) % 2 === 0) {
             ctx.fillStyle = 'white';
         }
-        ctx.fillRect(this.x, this.y, this.width, this.height);
+
+        // Interpolated Position
+        const interpX = this.prevX + (this.x - this.prevX) * alpha;
+        const interpY = this.prevY + (this.y - this.prevY) * alpha;
+
+        ctx.fillRect(interpX, interpY, this.width, this.height);
 
         if (this.hp < this.maxHp) {
             ctx.fillStyle = 'red';
-            ctx.fillRect(this.x, this.y - 10, this.width, 5);
+            ctx.fillRect(interpX, interpY - 10, this.width, 5);
             ctx.fillStyle = 'green';
-            ctx.fillRect(this.x, this.y - 10, this.width * (this.hp / this.maxHp), 5);
+            ctx.fillRect(interpX, interpY - 10, this.width * (this.hp / this.maxHp), 5);
         }
     }
 }
