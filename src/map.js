@@ -14,6 +14,7 @@ export class Map {
         this.rooms = [];
         this.roomGrid = [];
         this.exploredTiles = []; // 2D array of booleans
+        this.newlyExploredTiles = []; // Array of {x, y} for incremental minimap updates
         this.theme = 'default';
         this.wallImages = [
             getCachedImage(`assets/map/themes/${this.theme}/wall1.png`),
@@ -479,6 +480,7 @@ export class Map {
                         if (!this.exploredTiles[y][x]) {
                             this.exploredTiles[y][x] = true;
                             this.minimapDirty = true;
+                            this.newlyExploredTiles.push({ x, y });
                         }
                     }
                 }

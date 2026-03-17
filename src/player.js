@@ -546,15 +546,6 @@ export class Player extends Entity {
         if (this.dashTimer > 0) this.dashTimer -= dt;
 
         // Aether / Volt / Effects
-        this.sprites = this.sprites || {};
-        Object.keys(this.sprites).forEach(key => {
-            const s = this.sprites[key];
-            if (s && !s.data && Math.random() < 0.02) { 
-                const path = `assets/player/player_${key.includes('idol') ? 'idol' : 'run'}_${key.replace('idol_', '')}.json`;
-                getCachedJson(path).then(data => { if (data) s.data = data; });
-            }
-        });
-
         if (this.isAetherRush) {
             this.aetherRushTimer -= dt;
             this.aetherGauge = (this.aetherRushTimer / this.aetherRushDuration) * this.maxAetherGauge;

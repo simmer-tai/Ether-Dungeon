@@ -548,68 +548,68 @@ function drawMiniMap(ctx, game, screenWidth, screenHeight) {
 
     if (map.minimapDirty) {
         const oCtx = game.minimapCtx;
-        oCtx.fillStyle = '#000000'; // Black background for transparency representation
-        oCtx.fillRect(0, 0, mmW, mmH);
+        
+        // If newlyExploredTiles is empty, it means we need a full redraw (e.g., first frame or resized)
+        const isFullRedraw = map.newlyExploredTiles.length === 0;
 
-        // Draw Map Tiles
-        for (let y = 0; y < map.height; y++) {
-            for (let x = 0; x < map.width; x++) {
-                const tile = map.tiles[y][x];
+        if (isFullRedraw) {
+            oCtx.fillStyle = '#000000';
+            oCtx.fillRect(0, 0, mmW, mmH);
 
-                // Check for Staircase
-                let isStaircase = false;
-                let isShop = false;
-                let isBoss = false;
-                // Check room grid for staircase type
-                if (map.roomGrid && map.roomGrid[y] && map.roomGrid[y][x] !== -1) {
-                    const roomId = map.roomGrid[y][x];
-                    const room = map.rooms[roomId];
-                    if (room && room.type === 'staircase') {
-                        const centerX = room.x + Math.floor(room.w / 2);
-                        const centerY = room.y + Math.floor(room.h / 2);
-                        // Highlight center 2x2
-                        if ((x === centerX || x === centerX - 1) && (y === centerY || y === centerY - 1)) {
-                            isStaircase = true;
-                        }
-                    }
-                    if (room && room.type === 'shop') {
-                        isShop = true;
-                    }
-                    if (room && room.type === 'boss') {
-                        isBoss = true;
-                    }
-                }
-
-                if (isStaircase) {
-                    if (game.debugMode || map.exploredTiles[y][x]) {
-                        oCtx.fillStyle = '#00ffff'; // Cyan for stairs
-                        oCtx.fillRect(x * scale, y * scale, scale, scale);
-                    }
-                } else if (isBoss && tile === 0) {
-                    if (game.debugMode || map.exploredTiles[y][x]) {
-                        oCtx.fillStyle = '#660000'; // Red tint (solid color) for boss room
-                        oCtx.fillRect(x * scale, y * scale, scale, scale);
-                    }
-                } else if (isShop && tile === 0) {
-                    if (game.debugMode || map.exploredTiles[y][x]) {
-                        oCtx.fillStyle = '#665000'; // Gold tint (solid color) for shop floor
-                        oCtx.fillRect(x * scale, y * scale, scale, scale);
-                    }
-                } else if (tile === 1) {
-                    // Wall
-                    if (game.debugMode || map.exploredTiles[y][x]) {
-                        oCtx.fillStyle = '#888888';
-                        oCtx.fillRect(x * scale, y * scale, scale, scale);
-                    }
-                } else if (tile === 0) {
-                    // Floor
-                    if (game.debugMode || map.exploredTiles[y][x]) {
-                        oCtx.fillStyle = '#1a1a1a'; // Very subtle floor highlight
-                        oCtx.fillRect(x * scale, y * scale, scale, scale);
+            for (let y = 0; y < map.height; y++) {
+                for (let x = 0; x < map.width; x++) {
+                    if (map.exploredTiles[y][x]) {
+                        drawTileToMinimap(x, y);
                     }
                 }
             }
+        } else {
+            // Incremental update: only draw newly explored tiles
+            for (const tile of map.newlyExploredTiles) {
+                drawTileToMinimap(tile.x, tile.y);
+            }
         }
+
+        // Helper function for drawing a single tile to the offscreen canvas
+        function drawTileToMinimap(x, y) {
+            const tile = map.tiles[y][x];
+            let color = null;
+
+            // Check for Staircase/Shop/Boss
+            let isStaircase = false;
+            let isShop = false;
+            let isBoss = false;
+
+            if (map.roomGrid && map.roomGrid[y] && map.roomGrid[y][x] !== -1) {
+                const roomId = map.roomGrid[y][x];
+                const room = map.rooms[roomId];
+                if (room) {
+                    if (room.type === 'staircase') {
+                        const centerX = room.x + Math.floor(room.w / 2);
+                        const centerY = room.y + Math.floor(room.h / 2);
+                        if ((x === centerX || x === centerX - 1) && (y === centerY || y === centerY - 1)) {
+                            isStaircase = true;
+                        }
+                    } else if (room.type === 'shop') {
+                        isShop = true;
+                    } else if (room.type === 'boss') {
+                        isBoss = true;
+                    }
+                }
+            }
+
+            if (isStaircase) color = '#00ffff';
+            else if (isBoss && tile === 0) color = '#660000';
+            else if (isShop && tile === 0) color = '#665000';
+            else if (tile === 0) color = '#888888'; // Floors (rooms/corridors) are now gray
+
+            if (color) {
+                oCtx.fillStyle = color;
+                oCtx.fillRect(x * scale, y * scale, scale, scale);
+            }
+        }
+
+        map.newlyExploredTiles = []; // Clear tracking
         map.minimapDirty = false;
     }
 

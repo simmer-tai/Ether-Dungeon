@@ -1,6 +1,29 @@
 export class MapRenderer {
     constructor(map) {
         this.map = map;
+        this.gradients = null;
+    }
+
+    initGradients(ctx) {
+        const ts = this.map.tileSize;
+        const rimSize = 10;
+        this.gradients = {
+            n: ctx.createLinearGradient(0, 0, 0, rimSize),
+            s: ctx.createLinearGradient(0, -rimSize, 0, 0),
+            w: ctx.createLinearGradient(0, 0, rimSize, 0),
+            e: ctx.createLinearGradient(ts, 0, ts - rimSize, 0)
+        };
+        this.gradients.n.addColorStop(0, '#555');
+        this.gradients.n.addColorStop(1, '#000');
+        
+        this.gradients.s.addColorStop(0, '#000');
+        this.gradients.s.addColorStop(1, '#555');
+        
+        this.gradients.w.addColorStop(0, '#555');
+        this.gradients.w.addColorStop(1, '#000');
+        
+        this.gradients.e.addColorStop(0, '#555');
+        this.gradients.e.addColorStop(1, '#000');
     }
 
     draw(ctx, camera, player, debugMode = false) {
@@ -9,26 +32,10 @@ export class MapRenderer {
         const endX = startX + Math.ceil(camera.width / this.map.tileSize) + 1;
         const endY = startY + Math.ceil(camera.height / this.map.tileSize) + 1;
 
+        if (!this.gradients) this.initGradients(ctx);
+
         const ts = this.map.tileSize;
         const rimSize = 10;
-
-        // Pre-create gradient patterns relative to origin (0,0)
-        // These will be translated per-tile to avoid object creation in the nested loop
-        const gradN = ctx.createLinearGradient(0, 0, 0, rimSize);
-        gradN.addColorStop(0, '#555');
-        gradN.addColorStop(1, '#000');
-
-        const gradS = ctx.createLinearGradient(0, -rimSize, 0, 0);
-        gradS.addColorStop(0, '#000');
-        gradS.addColorStop(1, '#555');
-
-        const gradW = ctx.createLinearGradient(0, 0, rimSize, 0);
-        gradW.addColorStop(0, '#555');
-        gradW.addColorStop(1, '#000');
-
-        const gradE = ctx.createLinearGradient(ts, 0, ts - rimSize, 0);
-        gradE.addColorStop(0, '#555');
-        gradE.addColorStop(1, '#000');
 
         for (let y = Math.max(0, startY); y < Math.min(this.map.height, endY); y++) {
             for (let x = Math.max(0, startX); x < Math.min(this.map.width, endX); x++) {
@@ -112,7 +119,7 @@ export class MapRenderer {
                         // Back-facing wall (Floor is to the North) - Draw inside
                         ctx.save();
                         ctx.translate(tx, ty);
-                        ctx.fillStyle = gradN;
+                        ctx.fillStyle = this.gradients.n;
 
                         const offsetW = hasWestRim ? rimSize : 0;
                         const offsetE = hasEastRim ? rimSize : 0;
@@ -129,7 +136,7 @@ export class MapRenderer {
                         // Front-facing wall (Floor to the South) - Draw ABOVE the tile for thickness
                         ctx.save();
                         ctx.translate(tx, ty);
-                        ctx.fillStyle = gradS;
+                        ctx.fillStyle = this.gradients.s;
 
                         // No side miters needed as side rims are suppressed on standard front walls
                         ctx.fillRect(0, -rimSize, ts, rimSize);
@@ -140,7 +147,7 @@ export class MapRenderer {
                     if (hasWestRim) {
                         ctx.save();
                         ctx.translate(tx, ty);
-                        ctx.fillStyle = gradW;
+                        ctx.fillStyle = this.gradients.w;
 
                         const offsetN = isFloorN ? rimSize : 0;
 
@@ -158,7 +165,7 @@ export class MapRenderer {
                     if (hasEastRim) {
                         ctx.save();
                         ctx.translate(tx, ty);
-                        ctx.fillStyle = gradE;
+                        ctx.fillStyle = this.gradients.e;
 
                         const offsetN = isFloorN ? rimSize : 0;
 
