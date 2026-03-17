@@ -1672,7 +1672,7 @@ export const areaBehaviors = {
                             // Apply Status
                             if (params.statusEffect && Math.random() < (params.statusChance || 0)) {
                                 if (e.statusManager) {
-                                    e.statusManager.applyStatus(params.statusEffect, 5.0);
+                                    e.statusManager.applyStatus(params.statusEffect, 5.0, params.damage);
                                 }
                             }
 
@@ -1735,7 +1735,7 @@ export const areaBehaviors = {
                                                         // Apply Status
                                                         if (params.statusEffect && Math.random() < (params.statusChance || 0)) {
                                                             if (e2.statusManager) {
-                                                                e2.statusManager.applyStatus(params.statusEffect, 5.0);
+                                                                e2.statusManager.applyStatus(params.statusEffect, 5.0, this.damage);
                                                             }
                                                         }
 
@@ -2135,7 +2135,7 @@ export const areaBehaviors = {
                         if (Math.hypot(dx, dy) < this.currentRadius) {
                             enemy.takeDamage(params.damage, params.damageColor, params.aetherCharge, false);
                             if (enemy.statusManager) {
-                                enemy.statusManager.applyStatus('poison', 4.0); // 4s poison per tick
+                                enemy.statusManager.applyStatus('poison', 4.0, params.damage); // 4s poison per tick
                             }
                         }
                     });

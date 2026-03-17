@@ -976,7 +976,7 @@ export const projectileBehaviors = {
                     // Apply Status
                     if (this.statusEffect && (!this.statusChance || Math.random() < this.statusChance)) {
                         if (enemy.statusManager) {
-                            enemy.statusManager.applyStatus(this.statusEffect, 5.0);
+                            enemy.statusManager.applyStatus(this.statusEffect, 5.0, this.damage);
                         }
                     }
 
@@ -1601,7 +1601,7 @@ export const projectileBehaviors = {
 
                 if (params.statusEffect && Math.random() < (params.statusChance || 0)) {
                     if (enemy.statusManager) {
-                        enemy.statusManager.applyStatus(params.statusEffect, 5.0);
+                        enemy.statusManager.applyStatus(params.statusEffect, 5.0, params.damage);
                     }
                 }
 
@@ -1855,7 +1855,7 @@ export const projectileBehaviors = {
                             // Rush Mode: Apply ALL effects
                             suits.forEach(s => {
                                 const status = suitToStatus[s];
-                                enemy.statusManager.applyStatus(status, 5.0);
+                                enemy.statusManager.applyStatus(status, 5.0, this.damage);
                             });
                         } else {
                             // Normal Mode: Apply specific suit effect with chance
@@ -1863,7 +1863,7 @@ export const projectileBehaviors = {
                             if (Math.random() < chance) {
                                 const status = suitToStatus[this.suit];
                                 if (status) {
-                                    enemy.statusManager.applyStatus(status, 5.0);
+                                    enemy.statusManager.applyStatus(status, 5.0, this.damage);
                                 }
                             }
                         }

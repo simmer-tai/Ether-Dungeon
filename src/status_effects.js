@@ -26,7 +26,7 @@ export class StatusManager {
         this.effects = new Map(); // Map<type, { stacks, timer, duration }>
     }
 
-    applyStatus(type, duration, magnitude = null, maxStacks = 10) {
+    applyStatus(type, duration, skillDamage = null, maxStacks = 10) {
         // --- Elemental Interactions (Neutralization) ---
         if (type === STATUS_TYPES.WET && this.effects.has(STATUS_TYPES.BURN)) {
             this.effects.delete(STATUS_TYPES.BURN);
@@ -40,24 +40,38 @@ export class StatusManager {
         }
 
         if (!this.effects.has(type)) {
+            const dotValues = [];
+            if ((type === STATUS_TYPES.BURN || type === STATUS_TYPES.POISON) && skillDamage !== null) {
+                dotValues.push(skillDamage * 0.1);
+            }
             this.effects.set(type, {
                 stacks: 1,
                 timer: duration,
                 duration: duration,
-                magnitude: magnitude // Added custom magnitude
+                dotValues: dotValues, // Store 10% of skill damage per stack
+                magnitude: skillDamage // Keep for legacy/other status
             });
             this.showStatusText(type, 1);
         } else {
             const effect = this.effects.get(type);
             effect.timer = duration; // Reset timer
-            if (magnitude !== null) effect.magnitude = magnitude; // Update magnitude if provided
 
-            // Limit stacks (Special case for Burn/Wet: effectively unlimited for duration refresh, but stacks matter)
+            // Limit stacks
             const limit = (type === STATUS_TYPES.BURN || type === STATUS_TYPES.WET) ? 999 : maxStacks;
 
             if (effect.stacks < limit) {
                 effect.stacks++;
+                if ((type === STATUS_TYPES.BURN || type === STATUS_TYPES.POISON) && skillDamage !== null) {
+                    if (!effect.dotValues) effect.dotValues = [];
+                    effect.dotValues.push(skillDamage * 0.1);
+                }
                 this.showStatusText(type, effect.stacks);
+            } else if ((type === STATUS_TYPES.BURN || type === STATUS_TYPES.POISON) && skillDamage !== null) {
+                // Replace oldest stack damage if at limit (only for DOTs)
+                if (effect.dotValues && effect.dotValues.length > 0) {
+                    effect.dotValues.shift();
+                    effect.dotValues.push(skillDamage * 0.1);
+                }
             }
         }
     }
@@ -71,8 +85,8 @@ export class StatusManager {
                 effect.tickTimer = (effect.tickTimer || 0) + dt;
                 if (effect.tickTimer >= 1.0) { // Tick every 1 second
                     effect.tickTimer -= 1.0;
-                    const dmg = effect.stacks * 2; // 2 damage per stack
-                    this.owner.takeDamage(dmg, '#ff6600', 0, false, 0, 0, 0, true); // Orange color, no aether gain, silent
+                    const dmg = Math.round(effect.dotValues ? effect.dotValues.reduce((a, b) => a + b, 0) : effect.stacks * 2);
+                    this.owner.takeDamage(dmg, '#ff6600', 0, false, 0, 0, 0, true, null, 0); // Burn mitigated by defense (0 ignore)
                     this.showStatusText('burn_tick', dmg);
                 }
             }
@@ -82,8 +96,8 @@ export class StatusManager {
                 effect.tickTimer = (effect.tickTimer || 0) + dt;
                 if (effect.tickTimer >= 1.0) { // Tick every 1 second
                     effect.tickTimer -= 1.0;
-                    const dmg = effect.stacks * 2; // 2 damage per stack (same as burn)
-                    this.owner.takeDamage(dmg, '#800080', 0, false, 0, 0, 0, true); // Purple color, no aether gain, silent
+                    const dmg = Math.round(effect.dotValues ? effect.dotValues.reduce((a, b) => a + b, 0) : effect.stacks * 2);
+                    this.owner.takeDamage(dmg, '#800080', 0, false, 0, 0, 0, true, null, 0.25); // Poison ignores 25% defense
                     this.showStatusText('poison_tick', dmg);
                 }
             }

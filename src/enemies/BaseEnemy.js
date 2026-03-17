@@ -51,6 +51,10 @@ export class Enemy extends Entity {
 
         this.displayName = `Lv.${level} Enemy`;
         this.canDrop = true; // Flag to enable/disable item/chip drops
+        
+        // Defense System (Armor): Scales with level and HP. 
+        // Based on Warframe formula (300 constant), so we give slightly higher values for impact.
+        this.defense = Math.floor((level * 10) + (finalHp / 25));
     }
 
     update(dt) {
@@ -300,8 +304,8 @@ export class Enemy extends Entity {
         }
     }
 
-    takeDamage(amount, damageColor, aetherGain = 1, isCrit = false, kx = 0, ky = 0, kDuration = 0.15, silent = false) {
-        if (this.markedForDeletion || this.isSpawning) return; // Guard against multiple death triggers or spawning hits
+    takeDamage(amount, color, aetherGain = 0, isCrit = false, kx = 0, ky = 0, stunDuration = 0, silent = false, source = null, ignoreDefense = 0) {
+        if (this.markedForDeletion || this.isSpawning) return;
 
         // Gambler's Dice Randomization
         if (this.game.player && this.game.player.circuit) {
@@ -312,13 +316,22 @@ export class Enemy extends Entity {
             }
         }
 
+        // Apply Defense Mitigation (unless ignored)
+        if (this.defense > 0 && ignoreDefense < 1) {
+            // Formula: damage = amount * (300 / (300 + effectiveArmor))
+            // ignoreDefense is a fraction (e.g. 0.25 for 25% ignore)
+            const effectiveDefense = this.defense * (1 - ignoreDefense);
+            const multiplier = 300 / (300 + effectiveDefense);
+            amount = Math.max(1, Math.round(amount * multiplier));
+        }
+
         // Apply knockback if provided
         if (kx !== 0 || ky !== 0) {
             const resistance = this.knockbackResistance || 0;
             const factor = Math.max(0, 1 - resistance);
             this.knockbackVx = kx * factor;
             this.knockbackVy = ky * factor;
-            this.knockbackDuration = kDuration;
+            this.knockbackDuration = stunDuration || 0.15;
             // Stop current momentum to feel the impact
             this.vx = 0;
             this.vy = 0;
@@ -346,7 +359,7 @@ export class Enemy extends Entity {
         }
 
         // Apply Status Effects Damage Multiplier
-        let multiplier = this.statusManager.getDamageMultiplier();
+        let multiplier = this.statusManager ? this.statusManager.getDamageMultiplier(amount) : 1.0;
         amount = Math.round(amount * multiplier);
 
         // No invulnerability check for enemies so they can take rapid damage
@@ -597,10 +610,20 @@ export class Enemy extends Entity {
         // Draw HP Bar
         if (this.hp < this.maxHp) {
             const barY = Math.floor(this.y - 6);
+            const barWidth = this.width;
+            const barHeight = 4;
+
+            // Draw cyan decoration if the enemy has defense
+            if (this.defense > 0) {
+                ctx.strokeStyle = '#00ffff';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(Math.floor(this.x) - 1, barY - 1, barWidth + 2, barHeight + 2);
+            }
+
             ctx.fillStyle = 'red';
-            ctx.fillRect(Math.floor(this.x), barY, this.width, 4);
+            ctx.fillRect(Math.floor(this.x), barY, barWidth, barHeight);
             ctx.fillStyle = 'green';
-            ctx.fillRect(Math.floor(this.x), barY, this.width * (this.hp / this.maxHp), 4);
+            ctx.fillRect(Math.floor(this.x), barY, barWidth * (this.hp / this.maxHp), barHeight);
 
             // Draw Name above HP bar
             ctx.fillStyle = 'white';
@@ -663,6 +686,7 @@ export class TrainingDummy extends Enemy {
         this.isSpawning = false; // Appear immediately
         this.isSolid = true;
         this.knockbackResistance = 1.0; // 100% resistance
+        this.defense = 0; // Training dummy has no armor
     }
 
     update(dt) {

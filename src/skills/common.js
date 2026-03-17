@@ -330,7 +330,7 @@ export const spawnProjectile = (game, x, y, vx, vy, params) => {
                 // Apply Status (Even for custom handlers)
                 if (this.statusEffect && (!this.statusChance || Math.random() < this.statusChance)) {
                     if (enemy.statusManager) {
-                        enemy.statusManager.applyStatus(this.statusEffect, this.statusDuration || 5.0);
+                        enemy.statusManager.applyStatus(this.statusEffect, this.statusDuration || 5.0, this.damage);
                     }
                 }
 

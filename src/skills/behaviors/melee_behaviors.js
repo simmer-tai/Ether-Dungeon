@@ -89,7 +89,7 @@ export const meleeBehaviors = {
 
                 enemy.takeDamage(finalDamage, '#800080', params.aetherCharge, isCrit);
                 if (enemy.statusManager) {
-                    enemy.statusManager.applyStatus('poison', 10.0, null, 20); // Longer duration, higher max stacks
+                    enemy.statusManager.applyStatus('poison', 10.0, params.damage, 20); // Longer duration, higher max stacks
                 }
                 game.spawnParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, 8, '#BF40BF');
             }
