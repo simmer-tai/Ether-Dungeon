@@ -1,6 +1,7 @@
 import { LabUI } from './LabUI.js';
 
 export class DungeonCircuitUI {
+    static buildSubTab = 'circuit';
     static init(game) {
         this.game = game;
         
@@ -45,8 +46,53 @@ export class DungeonCircuitUI {
         const gridContainer = document.getElementById('dungeon-circuit-grid');
         if (!gridContainer) return;
 
+        // Sub-tabs Header (Step 3-1)
+        let header = document.getElementById('dungeon-circuit-tabs');
+        if (!header) {
+            header = document.createElement('div');
+            header.id = 'dungeon-circuit-tabs';
+            header.className = 'build-subtabs';
+            header.style.display = 'flex';
+            header.style.gap = '10px';
+            header.style.justifyContent = 'center';
+            header.style.padding = '8px';
+            header.style.borderTop = '1px solid rgba(0, 255, 255, 0.2)';
+            header.style.marginTop = '10px';
+            
+            // Insert below gridContainer
+            gridContainer.parentNode.insertBefore(header, gridContainer.nextSibling);
+        }
+
+        header.innerHTML = '';
+        const tabs = [
+            { id: 'circuit', label: '回路' },
+            { id: 'synergy', label: 'シナジー' }
+        ];
+
+        tabs.forEach(tab => {
+            const btn = document.createElement('div');
+            btn.className = `subtab-btn ${this.buildSubTab === tab.id ? 'active' : ''}`;
+            btn.textContent = tab.label;
+            btn.style.fontSize = '11px';
+            btn.style.cursor = 'pointer';
+            btn.style.color = this.buildSubTab === tab.id ? '#00ffff' : '#888';
+            btn.style.padding = '4px 12px';
+            btn.style.borderBottom = this.buildSubTab === tab.id ? '2px solid #00ffff' : 'none';
+            btn.onclick = () => {
+                this.buildSubTab = tab.id;
+                this.render();
+            };
+            header.appendChild(btn);
+        });
+
         gridContainer.innerHTML = '';
         const circuit = this.game.player.circuit;
+
+        // Synergy View (Step 3-2)
+        if (this.buildSubTab === 'synergy') {
+            LabUI.renderSynergyView(gridContainer);
+            return;
+        }
 
         for (let y = 0; y < 5; y++) {
             for (let x = 0; x < 5; x++) {

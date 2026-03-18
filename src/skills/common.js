@@ -1,6 +1,81 @@
 import { getCachedImage } from '../utils.js';
 
 // Helper for spawning projectiles
+export const spawnHitSlash = (game, x, y, options = {}) => {
+    const color     = options.color     || '#ffffff';
+    const slashCount = options.count   || 8;        // Increased default count
+    const baseSize  = options.size      || 36;       
+    const life      = options.life      || 0.11;     // Set back to 0.11s
+    const thickness = options.thickness || 3.5;      // Slightly thicker default
+
+    for (let i = 0; i < slashCount; i++) {
+        const baseAngle = (i / slashCount) * Math.PI * 2;
+        const jitter    = (Math.random() - 0.5) * (Math.PI / 6); // ±30deg
+        const angle     = baseAngle + jitter;
+
+        const len = baseSize * (0.7 + Math.random() * 0.5);
+
+        game.animations.push({
+            type:    'slash_ray',
+            x, y,
+            angle,
+            len,
+            thickness,
+            color,
+            life,
+            maxLife: life,
+            startDist: 2 + Math.random() * 6,
+            draw(ctx) {
+                const ratio = this.life / this.maxLife; // 1 to 0
+                
+                // Head bursts out snappy, tail follows and catches up
+                // headProgress: 0 -> 1 (snappy start)
+                const headProgress = 1 - (ratio * ratio); 
+                // tailProgress: 0 -> 1 (slow start, catches up at the end)
+                const tailProgress = 1 - Math.sqrt(ratio); 
+
+                const start = this.startDist + (this.len * tailProgress);
+                const end   = this.startDist + (this.len * headProgress);
+
+                // Ensure it doesn't flip if headProgress < tailProgress (though with these curves it shouldn't)
+                if (end < start) return;
+
+                const x1 = this.x + Math.cos(this.angle) * start;
+                const y1 = this.y + Math.sin(this.angle) * start;
+                const x2 = this.x + Math.cos(this.angle) * end;
+                const y2 = this.y + Math.sin(this.angle) * end;
+
+                ctx.save();
+                // Outer Glow / Main Color
+                ctx.globalAlpha   = ratio;
+                ctx.strokeStyle   = this.color;
+                ctx.lineWidth     = this.thickness * ratio;
+                ctx.lineCap       = 'round';
+                ctx.shadowBlur    = 8;
+                ctx.shadowColor   = this.color;
+                
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+
+                // Bright White Core
+                ctx.globalAlpha = ratio * 0.8;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth   = this.thickness * 0.4 * ratio;
+                ctx.shadowBlur  = 0;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+                
+                ctx.restore();
+            }
+        });
+    }
+};
+
+// Helper for spawning projectiles
 export const spawnProjectile = (game, x, y, vx, vy, params) => {
     // Image Caching
     const image = params.spriteSheet ? getCachedImage(params.spriteSheet) : null;
@@ -338,15 +413,38 @@ export const spawnProjectile = (game, x, y, vx, vy, params) => {
                     spawnLightningBurst(gameInstance, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, {
                         burstCount: 5, burstSize: 60, burstSpeed: 150
                     });
+                    spawnHitSlash(gameInstance, enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, {
+                        color: '#ffffff',
+                        count: isCrit ? 12 : 8,
+                        size: isCrit ? 45 : 30
+                    });
                 } else if (params.onHitEffect === 'explosion') {
                     const ex = this.x + this.w / 2;
                     const ey = this.y + this.h / 2;
                     spawnExplosion(gameInstance, ex, ey, params.color || '#ff8800', 1.0, params.shakeIntensity !== undefined ? params.shakeIntensity : 1.0);
+                    spawnHitSlash(gameInstance, ex, ey, {
+                        color: '#ffffff',
+                        count: isCrit ? 12 : 8,
+                        size: isCrit ? 45 : 30
+                    });
                 } else if (params.onHitEffect === 'ice_shatter') {
-                    spawnIceShatter(gameInstance, this.x + this.w / 2, this.y + this.h / 2, 8);
+                    const ex = this.x + this.w / 2;
+                    const ey = this.y + this.h / 2;
+                    spawnIceShatter(gameInstance, ex, ey, 8);
+                    spawnHitSlash(gameInstance, ex, ey, {
+                        color: '#ffffff',
+                        count: isCrit ? 12 : 8,
+                        size: isCrit ? 45 : 30
+                    });
                 } else {
                     const fallbackColor = params.trailColor || (params.iceTrail || params.damageColor === '#00ffff' ? '#00ffff' : 'orange');
                     gameInstance.spawnParticles(this.x, this.y, 8, fallbackColor);
+
+                    spawnHitSlash(gameInstance, this.x + this.w / 2, this.y + this.h / 2, {
+                        color: '#ffffff',
+                        count: isCrit ? 12 : 8,
+                        size: isCrit ? 45 : 30
+                    });
                 }
 
                 // DoT

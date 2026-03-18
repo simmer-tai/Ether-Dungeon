@@ -364,7 +364,7 @@ export const skillsDB = [
             duration: 5.0,
             tickInterval: 0.5,
             count: 30, // Increased count to 30
-            spacing: 30, // Much wider spacing per user request
+            spacing: 15, // Narrowed from 30 as per user request
             width: 20, // 10 * 2
             height: 92, // 46 * 2
             spriteSheet: 'assets/skills/vfx/ice_spike.png',

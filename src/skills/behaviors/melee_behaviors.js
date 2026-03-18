@@ -56,6 +56,13 @@ export const meleeBehaviors = {
                 }
 
                 enemy.takeDamage(finalDamage, params.damageColor, params.aetherCharge, isCrit, kx, ky);
+
+                // Apply Status
+                if (params.statusEffect && (!params.statusChance || Math.random() < params.statusChance)) {
+                    if (enemy.statusManager) {
+                        enemy.statusManager.applyStatus(params.statusEffect, 5.0, params.damage);
+                    }
+                }
                 const particleColor = isCrit ? '#FFD700' : 'red';
                 game.spawnParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, isCrit ? 10 : 5, particleColor);
             }

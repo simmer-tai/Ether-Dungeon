@@ -6,6 +6,7 @@ let skillSlots = null;
 
 export const getFormattedEffect = (chip, propName = 'nodeScaling', forcedValue = null) => {
     const value = forcedValue !== null ? forcedValue : chip.getScaledValue(propName);
+    if (!chip || !chip.data) return '';
     const type = chip.data.effectType;
     let text = '';
     const isPositive = value > 0;

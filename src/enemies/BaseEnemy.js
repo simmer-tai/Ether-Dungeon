@@ -1,5 +1,6 @@
 import { Entity, getCachedImage } from '../utils.js';
 import { StatusManager, STATUS_TYPES, statusIcons } from '../status_effects.js';
+import { spawnHitSlash } from '../skills/common.js';
 import { spawnProjectile } from '../skills/index.js';
 import { DropItem } from '../entities/DropItem.js';
 import { AetherLabManager } from '../AetherLabManager.js';
@@ -304,7 +305,7 @@ export class Enemy extends Entity {
         }
     }
 
-    takeDamage(amount, color, aetherGain = 0, isCrit = false, kx = 0, ky = 0, stunDuration = 0, silent = false, source = null, ignoreDefense = 0) {
+    takeDamage(amount, color, aetherGain = 0, isCrit = false, kx = 0, ky = 0, stunDuration = 0, silent = false, source = null, ignoreDefense = 0, isChain = false) {
         if (this.markedForDeletion || this.isSpawning) return;
 
         // Gambler's Dice Randomization
@@ -320,9 +321,24 @@ export class Enemy extends Entity {
         if (this.defense > 0 && ignoreDefense < 1) {
             // Formula: damage = amount * (300 / (300 + effectiveArmor))
             // ignoreDefense is a fraction (e.g. 0.25 for 25% ignore)
-            const effectiveDefense = this.defense * (1 - ignoreDefense);
+            
+            // CORROSION: 1秒ごとに敵の防御力を5%ダウン（最大5スタック＝最大25%ダウン）
+            let corrosionIgnore = 0;
+            if (this.statusManager && this.statusManager.effects.has(STATUS_TYPES.CORROSION)) {
+                const stacks = this.statusManager.effects.get(STATUS_TYPES.CORROSION).stacks;
+                corrosionIgnore = stacks * 0.05;
+            }
+
+            const totalIgnore = Math.min(1.0, ignoreDefense + corrosionIgnore);
+            const effectiveDefense = this.defense * (1 - totalIgnore);
             const multiplier = 300 / (300 + effectiveDefense);
             amount = Math.max(1, Math.round(amount * multiplier));
+        }
+
+        // FROSTBOLT: 次ダメージ×2の倍率バフ
+        if (this.frostboltCharge) {
+            amount *= 2;
+            this.frostboltCharge = false; // 消費
         }
 
         // Apply knockback if provided
@@ -367,12 +383,25 @@ export class Enemy extends Entity {
 
         // Handle Shock Chain Damage
         if (this.statusManager && this.statusManager.handleTakeDamage) {
-            this.statusManager.handleTakeDamage(amount, silent);
+            this.statusManager.handleTakeDamage(amount, isChain); // Use isChain correctly
         }
 
         // Spawn Damage Text (larger for crits)
         if (!silent) {
             const finalColor = isCrit ? '#ffff00' : '#ffffff';
+
+            if (amount > 0 && this.game) {
+                spawnHitSlash(this.game, 
+                    this.x + this.width / 2,
+                    this.y + this.height / 2,
+                    {
+                        color: '#ffffff',
+                        count: isCrit ? 12 : 8,
+                        size: isCrit ? 45 : 30,
+                    }
+                );
+            }
+
             const anim = {
                 type: 'text',
                 isDamageText: true,
@@ -608,6 +637,12 @@ export class Enemy extends Entity {
         }
 
         // Draw HP Bar
+        this.drawHPBar(ctx, interpX, interpY);
+
+        this.drawStatusIcons(ctx);
+    }
+
+    drawHPBar(ctx, interpX, interpY) {
         if (this.hp < this.maxHp) {
             const barY = Math.floor(this.y - 6);
             const barWidth = this.width;
@@ -635,8 +670,6 @@ export class Enemy extends Entity {
             ctx.shadowBlur = 0;
             ctx.textAlign = 'start'; // Reset
         }
-
-        this.drawStatusIcons(ctx);
     }
 
     drawStatusIcons(ctx) {
@@ -653,8 +686,7 @@ export class Enemy extends Entity {
                 if (icon && icon.complete && icon.naturalWidth !== 0) {
                     ctx.save();
                     
-                    // Silhouette Filter (White)
-                    ctx.filter = 'grayscale(1) brightness(2)';
+                    // Draw icon (removed white silhouette filter to support colored icons)
                     ctx.drawImage(icon, Math.floor(currentX), Math.floor(startY), iconSize, iconSize);
                     ctx.restore();
 

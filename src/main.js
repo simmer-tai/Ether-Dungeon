@@ -2321,6 +2321,8 @@ class Game {
                 this.ctx.arc(a.x, a.y, a.radius - 5, trailStart + 0.1, trailEnd - 0.1);
                 this.ctx.stroke();
 
+            } else if (a.type === 'slash_ray') {
+                if (a.draw) a.draw(this.ctx);
             } else if (a.type === 'particle') {
                 this.ctx.fillStyle = a.color || 'white';
                 let currentW = a.w;

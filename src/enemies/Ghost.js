@@ -156,30 +156,9 @@ export class Ghost extends Enemy {
             ctx.restore();
 
             // BaseEnemy's UI (HP Bar)
-            this.drawHPBar(ctx, interpX, interpY);
+            super.drawHPBar(ctx, interpX, interpY);
         } else {
             super.draw(ctx, alpha);
         }
-    }
-
-    // Helper to draw HP bar since we override draw
-    drawHPBar(ctx, interpX, interpY) {
-        if (this.hp < this.maxHp) {
-            const barY = interpY - 12;
-            ctx.fillStyle = 'red';
-            ctx.fillRect(interpX, barY, this.width, 4);
-            ctx.fillStyle = 'green';
-            ctx.fillRect(interpX, barY, this.width * (this.hp / this.maxHp), 4);
-
-            ctx.fillStyle = 'white';
-            ctx.font = 'bold 10px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.shadowColor = 'black';
-            ctx.shadowBlur = 4;
-            ctx.fillText(this.displayName, interpX + this.width / 2, barY - 4);
-            ctx.shadowBlur = 0;
-            ctx.textAlign = 'start';
-        }
-        this.drawStatusIcons(ctx);
     }
 }

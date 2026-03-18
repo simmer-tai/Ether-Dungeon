@@ -105,6 +105,14 @@ export const areaBehaviors = {
                                 const finalDamage = isCrit ? params.damage * critMult : params.damage;
 
                                 enemy.takeDamage(finalDamage, params.damageColor, params.aetherCharge, isCrit, kx, ky);
+
+                                // Apply Status (DoT Field)
+                                if (params.statusEffect && (!params.statusChance || Math.random() < params.statusChance)) {
+                                    if (enemy.statusManager) {
+                                        enemy.statusManager.applyStatus(params.statusEffect, 5.0, params.damage);
+                                    }
+                                }
+
                                 // Shake on hit
                                 game.camera.shake(0.15, 3.5);
 
@@ -137,6 +145,13 @@ export const areaBehaviors = {
                     const finalDamage = isCrit ? params.damage * critMult : params.damage;
 
                     enemy.takeDamage(finalDamage, params.damageColor, params.aetherCharge, isCrit, kx, ky);
+
+                    // Apply Status (Instant Damage)
+                    if (params.statusEffect && (!params.statusChance || Math.random() < params.statusChance)) {
+                        if (enemy.statusManager) {
+                            enemy.statusManager.applyStatus(params.statusEffect, 5.0, params.damage);
+                        }
+                    }
                     game.spawnParticles(ex, ey, isCrit ? 15 : 10, isCrit ? '#FFD700' : '#ff0000');
                 }
             });
@@ -319,6 +334,13 @@ export const areaBehaviors = {
                                 const finalDamage = isCrit ? this.damage * (this.critMultiplier || 2.0) : this.damage;
 
                                 enemy.takeDamage(finalDamage, this.damageColor, this.aetherCharge, isCrit);
+
+                                // Apply Status
+                                if (params.statusEffect && (!params.statusChance || Math.random() < params.statusChance)) {
+                                    if (enemy.statusManager) {
+                                        enemy.statusManager.applyStatus(params.statusEffect, 5.0, this.damage);
+                                    }
+                                }
                                 gameInstance.spawnParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, isCrit ? 10 : 5, isCrit ? '#FFD700' : 'cyan');
                                 this.hitTimers.set(enemy.id, 0);
                             }
@@ -753,13 +775,10 @@ export const areaBehaviors = {
                                     // drawProjectile translates to y + h*1.0? 
                                     // Let's check drawProjectile logic:
                                     // this.ctx.translate(p.x + p.w * anchorX, p.y + p.h * anchorY);
-                                    // So if y is fixed at feet, and h grows, and we want it to grow UP:
-                                    // Y should clearly be the feet Y.
-                                    // If h grows, the anchor point (feet) stays at p.y + p.h (bottom).
-                                    // So p.y should simply be feet - p.h? 
-                                    // NO. If we pass anchorY=1.0 to drawProjectile, it translates to y+h.
-                                    // If we want that point to be "Feet", then Feet = y + h.
-                                    // => y = Feet - h.
+                                    // So if y is fixed at feet, and h grows, and anchorY is 1.0, 
+                                    // then the bottom of the image is at p.y + p.h.
+                                    // If we want that point to be "Feet", then Feet = p.y + p.h.
+                                    // => p.y = Feet - p.h.
                                     // So as h changes, y must changes.
 
                                     this.y = this.baseY - this.h;
@@ -788,6 +807,14 @@ export const areaBehaviors = {
                                                 const finalDamage = isCrit ? this.damage * critMult : this.damage;
 
                                                 enemy.takeDamage(finalDamage, this.damageColor, this.aetherCharge, isCrit);
+
+                                                // Apply Status
+                                                if (params.statusEffect && (!params.statusChance || Math.random() < params.statusChance)) {
+                                                    if (enemy.statusManager) {
+                                                        enemy.statusManager.applyStatus(params.statusEffect, 5.0, this.damage);
+                                                    }
+                                                }
+
                                                 game.spawnParticles(ex, ey - 10, isCrit ? 10 : 5, isCrit ? '#FFD700' : '#a5f2f3');
                                                 // Camera shake removed per user request
                                             }

@@ -219,6 +219,13 @@ export const projectileBehaviors = {
                     }
 
                     enemy.takeDamage(finalDamage, params.damageColor, this.aetherCharge, isCrit, kx, ky);
+
+                    // Apply Status
+                    if (params.statusEffect && (!params.statusChance || Math.random() < params.statusChance)) {
+                        if (enemy.statusManager) {
+                            enemy.statusManager.applyStatus(params.statusEffect, 5.0, params.damage);
+                        }
+                    }
                     // Expanding Circle Effect (Explosion) - Small & Light shake
                     spawnExplosion(gameInstance, this.x + this.w / 2, this.y + this.h / 2, params.color || 'orange', 0.25, 0.1);
 
@@ -570,6 +577,13 @@ export const projectileBehaviors = {
                     }
 
                     enemy.takeDamage(finalDamage, this.damageColor, this.aetherCharge, isCrit, kx, ky);
+
+                // Apply Status
+                if (params.statusEffect && (!params.statusChance || Math.random() < params.statusChance)) {
+                    if (enemy.statusManager) {
+                        enemy.statusManager.applyStatus(params.statusEffect, 5.0, params.damage);
+                    }
+                }
                     spawnBounceSparkImpact(gameInstance, this.x, this.y, params);
 
                     // 2. Spawn DoT Logic Object (if tickCount > 0)
@@ -1105,6 +1119,13 @@ export const projectileBehaviors = {
                     const finalDamage = isCrit ? this.damage * critMult : this.damage;
                     enemy.takeDamage(finalDamage, this.damageColor, this.aetherCharge, isCrit);
 
+                    // Apply Status
+                    if (params.statusEffect && (!params.statusChance || Math.random() < params.statusChance)) {
+                        if (enemy.statusManager) {
+                            enemy.statusManager.applyStatus(params.statusEffect, 5.0, params.damage);
+                        }
+                    }
+
                     // Optional: White wind hit particle
                     if (Math.random() < 0.5) {
                         gameObj.animations.push({
@@ -1345,6 +1366,13 @@ export const projectileBehaviors = {
                 const critMult_cl = this.critMultiplier + gameObj.player.critDamageBonus;
                 const finalDamage_cl = isCrit_cl ? this.damage * critMult_cl : this.damage;
                 enemy.takeDamage(finalDamage_cl, this.damageColor, this.aetherCharge, isCrit_cl);
+
+                // Apply Status
+                if (params.statusEffect && (!params.statusChance || Math.random() < params.statusChance)) {
+                    if (enemy.statusManager) {
+                        enemy.statusManager.applyStatus(params.statusEffect, 5.0, params.damage);
+                    }
+                }
 
                 // 2. Visual Burst
                 // 2. Visual Burst

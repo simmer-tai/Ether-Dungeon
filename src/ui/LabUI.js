@@ -410,27 +410,34 @@ export class LabUI {
         // Left Section: Circuit Grid or Status View
         const leftColumn = document.createElement('div');
         leftColumn.className = 'circuit-left-column';
-        leftColumn.style.flex = '0 0 260px'; // Increased from 240px to give more breathing room
+        if (this.buildSubTab === 'circuit') {
+            leftColumn.style.flex = '0 0 260px'; // 現状維持
+        } else {
+            leftColumn.style.flex = '1'; // 全幅
+        }
 
         // Sub-tabs Header
         const subTabHeader = document.createElement('div');
         subTabHeader.className = 'build-subtabs';
         subTabHeader.style.display = 'flex';
+        subTabHeader.style.width = '100%';
         subTabHeader.style.gap = '8px';
-        subTabHeader.style.marginBottom = '6px'; // Tightened from 10px
+        subTabHeader.style.marginBottom = '8px';
         subTabHeader.style.borderBottom = '1px solid rgba(0, 255, 255, 0.2)';
         subTabHeader.style.paddingBottom = '4px';
 
+        const activeFusions = circuit.getActiveFusions();
         const tabs = [
             { id: 'circuit', label: 'エーテル回路' },
-            { id: 'status', label: 'ステータス' }
+            { id: 'status', label: 'ステータス' },
+            { id: 'synergy', label: activeFusions.length > 0 ? 'シナジー ●' : 'シナジー' }
         ];
 
         tabs.forEach(tab => {
             const btn = document.createElement('div');
             btn.className = `subtab-btn ${this.buildSubTab === tab.id ? 'active' : ''}`;
             btn.textContent = tab.label;
-            btn.style.fontSize = '12px';
+            btn.style.fontSize = '11px';
             btn.style.fontWeight = 'bold';
             btn.style.padding = '4px 12px';
             btn.style.cursor = 'pointer';
@@ -443,10 +450,12 @@ export class LabUI {
             };
             subTabHeader.appendChild(btn);
         });
-        leftColumn.appendChild(subTabHeader);
+        container.appendChild(subTabHeader);
 
         if (this.buildSubTab === 'status') {
             this.renderStatusView(leftColumn);
+        } else if (this.buildSubTab === 'synergy') {
+            this.renderSynergyView(leftColumn);
         } else {
             const gridSection = document.createElement('div');
             gridSection.className = 'circuit-grid-container';
@@ -692,7 +701,9 @@ export class LabUI {
             invGrid.appendChild(cell);
         }
         invSection.appendChild(invGrid);
-        main.appendChild(invSection);
+        if (this.buildSubTab === 'circuit') {
+            main.appendChild(invSection);
+        }
 
         container.appendChild(main);
     }
@@ -1208,7 +1219,8 @@ export class LabUI {
             inertiaScaling: '慣性(移動速度1%毎)',
             ukemiChance: '受け身(発動率)',
             accelerationScaling: '加速(最大)',
-            damageRandomRange: '一発逆転(変動幅)'
+            damageRandomRange: '一発逆転(変動幅)',
+            poisonDamageMult: '毒属性ダメージ'
         };
 
         const list = document.createElement('div');
@@ -1292,5 +1304,292 @@ export class LabUI {
 
         statusView.appendChild(list);
         container.appendChild(statusView);
+    }
+
+    static renderSynergyView(container) {
+        const circuit = this.game.player.circuit;
+        const activeList = circuit.getActiveFusions();
+        const nearList = circuit.getNearFusions();
+
+        const synergyView = document.createElement('div');
+        synergyView.className = 'circuit-synergy-view';
+        synergyView.style.padding = '10px';
+        synergyView.style.background = 'rgba(0, 0, 0, 0.4)';
+        synergyView.style.borderRadius = '4px';
+        synergyView.style.height = '184px';
+        synergyView.style.overflowY = 'auto';
+        synergyView.style.border = '1px solid rgba(0, 255, 255, 0.1)';
+        synergyView.style.fontSize = '11px';
+
+        const FUSION_DISPLAY = {
+            corrosion: {
+                name: '腐食',
+                effect: '「炎上」と「中毒」を同時に付与すると、各1スタックを消費して「腐食」に変換。\n防御力を5%ダウンさせる（最大5スタックで25%ダウン）。',
+            },
+            frostbolt: {
+                name: '極電',
+                effect: '「凍結」と「感電」を同時に付与すると、各1スタックを消費して「極電」に変換。\n0.5秒間スタンし、次に受けるダメージが2倍になる。',
+            },
+            sanguine: {
+                name: '血炎',
+                effect: '「出血」と「炎上」を同時に付与すると、各1スタックを消費して「血炎」に変換。\n出血スタック数 × スキルダメージ30%の即時爆発ダメージを与える。',
+            },
+            voltbleed: {
+                name: '感電爆血',
+                effect: '「感電」と「出血」を同時に付与すると、各1スタックを消費して「感電爆血」に変換。\n感電と同じく被ダメージ時に半径150px以内の敵へ連鎖するが、伝達量がスタック数 × 5%になる（最大10スタックで50%）。',
+            },
+            frostpoison: {
+                name: '凍毒',
+                effect: '「凍結」と「中毒」を同時に付与すると、各1スタックを消費して「凍毒」に変換。\n中毒のダメージ間隔が1秒から0.3秒に短縮される。',
+            },
+            stormfire: {
+                name: '烈火雷鳴',
+                effect: '「炎上」と「感電」を同時に付与すると、各1スタックを消費して「烈火雷鳴」に変換。\n炎上の継続ダメージが1.5倍に強化される。',
+            },
+        };
+
+        const findChipByEffectType = (circuit, effectType) => {
+            for (let y = 0; y < 5; y++) {
+                for (let x = 0; x < 5; x++) {
+                    const chip = circuit.grid[y][x];
+                    if (chip && chip !== 'core' && chip.data.effectType === effectType) return chip;
+                }
+            }
+            // Also check owned chips that are not equipped but might be active (e.g. from other sources)
+            for (const chip of circuit.ownedChips) {
+                if (chip.data.effectType === effectType) return chip;
+            }
+            return null;
+        };
+
+        const renderChipIcons = (chipIds, activeChipIds, circuit) => {
+            const wrap = document.createElement('div');
+            wrap.style.display = 'flex';
+            wrap.style.alignItems = 'center';
+            wrap.style.gap = '4px';
+            wrap.style.marginBottom = '6px';
+
+            chipIds.forEach((effectType, i) => {
+                const chip = findChipByEffectType(circuit, effectType);
+                const isActive = activeChipIds.includes(effectType);
+
+                const img = document.createElement('img');
+                img.style.width = '22px';
+                img.style.height = '22px';
+                img.style.objectFit = 'contain';
+                img.style.borderRadius = '3px';
+                img.style.border = '1px solid';
+                img.style.padding = '2px';
+                img.style.background = '#111';
+
+                if (chip) {
+                    img.src = chip.data.icon;
+                    img.title = chip.data.name;
+                    img.style.borderColor = isActive ? '#00ffff44' : '#333';
+                    img.style.filter = isActive ? 'none' : 'grayscale(1) brightness(0.5)';
+                } else {
+                    img.src = 'assets/ui/chips/icon_unknown.png';
+                    img.style.borderColor = '#333';
+                    img.style.filter = 'grayscale(1) brightness(0.4)';
+                    img.title = '未入手';
+                }
+
+                img.onerror = () => {
+                    img.style.display = 'none';
+                    const fallback = document.createElement('span');
+                    fallback.textContent = chip ? chip.data.name : '?';
+                    fallback.style.fontSize = '9px';
+                    fallback.style.color = isActive ? '#00ffff' : '#666';
+                    wrap.insertBefore(fallback, img.nextSibling);
+                };
+
+                wrap.appendChild(img);
+
+                if (i < chipIds.length - 1) {
+                    const plus = document.createElement('span');
+                    plus.textContent = '＋';
+                    plus.style.fontSize = '11px';
+                    plus.style.color = '#555';
+                    wrap.appendChild(plus);
+                }
+            });
+            return wrap;
+        };
+
+        const createCard = (fusionType, type, fusionData = {}) => {
+            const display = FUSION_DISPLAY[fusionType];
+            if (!display) return null;
+
+            const card = document.createElement('div');
+            card.style.border = '1px solid #333';
+            card.style.borderRadius = '4px';
+            card.style.padding = '7px 10px';
+            card.style.cursor = 'default';
+            card.style.transition = 'border-color 0.15s';
+            card.style.background = 'rgba(255,255,255,0.03)';
+
+            let accentColor = '#555';
+            let badgeText = '-';
+            let status = 'inactive';
+
+            if (type === 'active') {
+                accentColor = '#00ffff';
+                badgeText = 'ACTIVE';
+                status = 'active';
+            } else if (type === 'near') {
+                accentColor = '#ff6666';
+                badgeText = 'あと1枚';
+                status = 'near';
+            } else if (type === 'all') {
+                accentColor = '#555';
+                badgeText = '未発動';
+                status = 'inactive';
+            }
+
+            card.innerHTML = `
+                <div class="synergy-card-header" style="display: flex; align-items: center; gap: 6px;">
+                    <div class="synergy-dot" style="width: 7px; height: 7px; border-radius: 50%; background: ${accentColor}; ${status === 'active' ? 'animation: deployable-pulse 1.5s infinite;' : ''}"></div>
+                    <div class="synergy-name" style="font-size: 12px; font-weight: bold; flex: 1; color: ${status === 'active' ? '#fff' : '#aaa'};">${display.name}</div>
+                    <div class="synergy-badge" style="font-size: 9px; color: ${accentColor};">${badgeText}</div>
+                </div>
+                <div class="synergy-detail" style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #222; max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.25s ease, opacity 0.2s ease;">
+                    <div class="synergy-pills-container" style="display: flex; gap: 4px; flex-wrap: wrap;"></div>
+                    <div class="synergy-effect" style="font-size: 10px; color: #666; line-height: 1.6; margin-top: 6px;"></div>
+                </div>
+            `;
+
+            const detail = card.querySelector('.synergy-detail');
+            const pillsContainer = card.querySelector('.synergy-pills-container');
+            const effectEl = card.querySelector('.synergy-effect');
+
+            display.effect.split('\n').forEach((line, i) => {
+                if (i > 0) effectEl.appendChild(document.createElement('br'));
+                effectEl.appendChild(document.createTextNode(line));
+            });
+
+            const reqTypes = fusionData.requiredEffectTypes || (fusionType === 'corrosion' ? ['fire_damage_mult', 'poison_damage_mult'] : 
+                                                               fusionType === 'frostbolt' ? ['ice_damage_mult', 'thunder_damage_mult'] :
+                                                               fusionType === 'sanguine' ? ['blood_damage_mult', 'fire_damage_mult'] :
+                                                               fusionType === 'voltbleed' ? ['thunder_damage_mult', 'blood_damage_mult'] :
+                                                               fusionType === 'frostpoison' ? ['ice_damage_mult', 'poison_damage_mult'] :
+                                                               fusionType === 'stormfire' ? ['fire_damage_mult', 'thunder_damage_mult'] : []);
+            
+            let activeChipIds = [];
+            if (type === 'active') {
+                activeChipIds = [...reqTypes];
+            } else {
+                activeChipIds = reqTypes.filter(et => {
+                    const chip = findChipByEffectType(circuit, et);
+                    return chip && chip.isActive;
+                });
+            }
+            
+            pillsContainer.appendChild(renderChipIcons(reqTypes, activeChipIds, circuit));
+
+            if (type === 'near' && fusionData.missingChipName) {
+                const hint = document.createElement('div');
+                hint.style.fontSize = '9px';
+                hint.style.color = '#ff6666';
+                hint.style.marginTop = '4px';
+                hint.style.opacity = '0.8';
+                hint.textContent = `→ 「${fusionData.missingChipName}」を起動で発動`;
+                detail.appendChild(hint);
+            }
+
+            card.onmouseenter = () => {
+                card.style.borderColor = accentColor;
+                detail.style.maxHeight = '200px';
+                detail.style.opacity = '1';
+            };
+            card.onmouseleave = () => {
+                card.style.borderColor = '#333';
+                detail.style.maxHeight = '0';
+                detail.style.opacity = '0';
+            };
+
+            return card;
+        };
+
+        const createSection = (title, items, type) => {
+            if (items.length === 0 && type === 'near') return null;
+
+            const section = document.createElement('div');
+            section.style.marginBottom = '12px';
+
+            const header = document.createElement('div');
+            header.style.color = '#00ffff';
+            header.style.fontSize = '10px';
+            header.style.marginBottom = '8px';
+            header.style.borderBottom = '1px solid rgba(0,255,255,0.2)';
+            header.textContent = title;
+            section.appendChild(header);
+
+            const grid = document.createElement('div');
+            grid.style.display = 'grid';
+            grid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+            grid.style.gap = '6px';
+            grid.style.alignItems = 'start';
+
+            if (items.length === 0) {
+                const empty = document.createElement('div');
+                empty.style.color = '#555';
+                empty.style.fontSize = '10px';
+                empty.style.gridColumn = 'span 2';
+                empty.textContent = title === '発動中' ? '現在発動中のシナジーはありません' : 'なし';
+                grid.appendChild(empty);
+            } else {
+                items.forEach(item => {
+                    const card = createCard(item.fusionType, type, item);
+                    if (card) grid.appendChild(card);
+                });
+            }
+
+            section.appendChild(grid);
+            return section;
+        };
+
+        // 1. Active
+        synergyView.appendChild(createSection('発動中', activeList, 'active'));
+
+        // 2. Near
+        const nearSection = createSection('あと1枚で発動', nearList, 'near');
+        if (nearSection) synergyView.appendChild(nearSection);
+
+        // 3. All List
+        const allHeader = document.createElement('div');
+        allHeader.style.color = '#666';
+        allHeader.style.fontSize = '10px';
+        allHeader.style.marginBottom = '8px';
+        allHeader.style.borderBottom = '1px solid rgba(255,255,255,0.1)';
+        allHeader.style.marginTop = '10px';
+        allHeader.textContent = '全シナジー一覧';
+        synergyView.appendChild(allHeader);
+
+        const allGrid = document.createElement('div');
+        allGrid.style.display = 'grid';
+        allGrid.style.gridTemplateColumns = 'repeat(2, 1fr)';
+        allGrid.style.gap = '6px';
+        allGrid.style.alignItems = 'start';
+
+        Object.keys(FUSION_DISPLAY).forEach(key => {
+            const isActive = activeList.some(a => a.fusionType === key);
+            const isNear = nearList.some(n => n.fusionType === key);
+            
+            let type = 'all';
+            let data = {};
+            if (isActive) {
+                type = 'active';
+                data = activeList.find(a => a.fusionType === key);
+            } else if (isNear) {
+                type = 'near';
+                data = nearList.find(n => n.fusionType === key);
+            }
+
+            const card = createCard(key, type, data);
+            if (card) allGrid.appendChild(card);
+        });
+        synergyView.appendChild(allGrid);
+
+        container.appendChild(synergyView);
     }
 }

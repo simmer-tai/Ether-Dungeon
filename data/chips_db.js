@@ -354,5 +354,19 @@ export const chipsDB = [
         effectType: 'none',
         icon: 'assets/ui/chips/icon_connector.png',
         nodeScaling: { min: 0, max: 0 }
+    },
+    {
+        id: 'virulence',
+        name: '猛毒',
+        category: '技巧',
+        rarity: 'rare',
+        description: '毒属性スキルダメージアップ',
+        baseCost: 4,
+        ranks: [{ level: 1, value: 0.05, cost: 4 }, { level: 2, value: 0.15, cost: 5 },
+                { level: 3, value: 0.25, cost: 6 }, { level: 4, value: 0.35, cost: 7 },
+                { level: 5, value: 0.50, cost: 8 }],
+        effectType: 'poison_damage_mult',
+        icon: 'assets/ui/chips/icon_virulence.png',
+        nodeScaling: { min: 0.05, max: 0.50 }
     }
 ];

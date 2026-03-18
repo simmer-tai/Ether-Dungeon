@@ -399,7 +399,8 @@ export class AetherCircuitManager {
             inertiaScaling: { current: 0, potential: 0 },
             ukemiChance: { current: 0, potential: 0 },
             accelerationScaling: { current: 0, potential: 0 },
-            damageRandomRange: { current: 0, potential: 0 }
+            damageRandomRange: { current: 0, potential: 0 },
+            poisonDamageMult: { current: 0, potential: 0 }
         };
 
         for (let y = 0; y < 5; y++) {
@@ -408,7 +409,8 @@ export class AetherCircuitManager {
                 if (chip && chip !== 'core' && chip.isActive) {
                     const currentEffect = chip.getCurrentEffect();
                     const potentialEffect = chip.getPotentialValue('nodeScaling');
-                    const et = chip.data.effectType;
+                    const et = chip.data?.effectType;
+                    if (!et) continue;
 
                     if (et === 'damage_mult') {
                         stats.damageMult.current += currentEffect;
@@ -490,6 +492,10 @@ export class AetherCircuitManager {
                         stats.damageRandomRange.current += currentEffect;
                         stats.damageRandomRange.potential += potentialEffect;
                     }
+                    if (et === 'poison_damage_mult') {
+                        stats.poisonDamageMult.current += currentEffect;
+                        stats.poisonDamageMult.potential += potentialEffect;
+                    }
                 }
             }
         }
@@ -517,7 +523,7 @@ export class AetherCircuitManager {
             const chip = new ChipInstance(chipData.id, chipData.level, chipData.isIdentified !== false, chipData.instanceId);
             if (chipData.nodes) chip.nodes = chipData.nodes;
             return chip;
-        });
+        }).filter(chip => chip.data !== undefined);
 
         // Load grid placement
         if (data.gridData) {
@@ -547,6 +553,84 @@ export class AetherCircuitManager {
             ownedChips: this.ownedChips.map(c => c.serialize()),
             gridData: gridData
         };
+    }
+
+    getActiveFusions() {
+        const FUSION_EFFECT_MAP = {
+            corrosion:   ['fire_damage_mult',    'poison_damage_mult'],
+            frostbolt:   ['ice_damage_mult',     'thunder_damage_mult'],
+            sanguine:    ['blood_damage_mult',   'fire_damage_mult'],
+            voltbleed:   ['thunder_damage_mult', 'blood_damage_mult'],
+            frostpoison: ['ice_damage_mult',     'poison_damage_mult'],
+            stormfire:   ['fire_damage_mult',    'thunder_damage_mult'],
+        };
+
+        const activeChips = [];
+        for (let y = 0; y < 5; y++) {
+            for (let x = 0; x < 5; x++) {
+                const chip = this.grid[y][x];
+                if (chip && chip !== 'core' && chip.isActive && chip.data) {
+                    activeChips.push(chip);
+                }
+            }
+        }
+
+        const activeFusions = [];
+        for (const [fusionType, requiredTypes] of Object.entries(FUSION_EFFECT_MAP)) {
+            const foundChips = requiredTypes.map(type => activeChips.find(c => c.data?.effectType === type));
+            if (foundChips.every(c => c !== undefined)) {
+                activeFusions.push({
+                    fusionType: fusionType,
+                    requiredEffectTypes: requiredTypes,
+                    activeChipNames: foundChips.map(c => c.data?.name || 'Unknown')
+                });
+            }
+        }
+        return activeFusions;
+    }
+
+    getNearFusions() {
+        const FUSION_EFFECT_MAP = {
+            corrosion:   ['fire_damage_mult',    'poison_damage_mult'],
+            frostbolt:   ['ice_damage_mult',     'thunder_damage_mult'],
+            sanguine:    ['blood_damage_mult',   'fire_damage_mult'],
+            voltbleed:   ['thunder_damage_mult', 'blood_damage_mult'],
+            frostpoison: ['ice_damage_mult',     'poison_damage_mult'],
+            stormfire:   ['fire_damage_mult',    'thunder_damage_mult'],
+        };
+
+        const activeChips = [];
+        for (let y = 0; y < 5; y++) {
+            for (let x = 0; x < 5; x++) {
+                const chip = this.grid[y][x];
+                if (chip && chip !== 'core' && chip.isActive) {
+                    activeChips.push(chip);
+                }
+            }
+        }
+
+        const nearFusions = [];
+        for (const [fusionType, requiredTypes] of Object.entries(FUSION_EFFECT_MAP)) {
+            const foundChips = requiredTypes.map(type => activeChips.find(c => c.data?.effectType === type));
+            const missingCount = foundChips.filter(c => c === undefined).length;
+            
+            if (missingCount === 1) {
+                const missingIndex = foundChips.findIndex(c => c === undefined);
+                const missingType = requiredTypes[missingIndex];
+                
+                // For missingChipName, we need to find a chip that HAS this effectType in ownedChips or chipsDB
+                const representativeChip = chipsDB.find(c => c.effectType === missingType);
+                const missingName = representativeChip ? representativeChip.name : missingType;
+
+                nearFusions.push({
+                    fusionType: fusionType,
+                    requiredEffectTypes: requiredTypes,
+                    activeChipNames: foundChips.filter(c => c !== undefined).map(c => c.data?.name || 'Unknown'),
+                    missingChipName: missingName
+                });
+            }
+        }
+        return nearFusions;
     }
 }
 

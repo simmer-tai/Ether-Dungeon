@@ -895,6 +895,6 @@ export class AetherPrime extends Boss {
         }
 
         // Draw Boss HP Bar (standard for bosses if preferred, though Prime often relies on shield mechanic)
-        super.drawHPBar(ctx);
+        super.drawHPBar(ctx, interpX, interpY);
     }
 }

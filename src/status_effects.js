@@ -7,7 +7,13 @@ export const statusIcons = {
     burn: getCachedImage('assets/skills/icons/icon_burn.png'),
     wet: getCachedImage('assets/skills/icons/icon_wet.png'),
     poison: getCachedImage('assets/skills/icons/icon_poison.png'),
-    shock: getCachedImage('assets/skills/icons/shock.png') // Fixed name from icon_shock.png
+    shock: getCachedImage('assets/skills/icons/shock.png'), // Fixed name from icon_shock.png
+    corrosion: getCachedImage('assets/skills/icons/icon_corrosion.png'),
+    frostbolt: getCachedImage('assets/skills/icons/icon_frostbolt.png'),
+    sanguine: getCachedImage('assets/skills/icons/icon_sanguine.png'),
+    voltbleed: getCachedImage('assets/skills/icons/icon_voltbleed.png'),
+    frostpoison: getCachedImage('assets/skills/icons/icon_frostpoison.png'),
+    stormfire: getCachedImage('assets/skills/icons/icon_stormfire.png')
 };
 
 export const STATUS_TYPES = {
@@ -17,8 +23,24 @@ export const STATUS_TYPES = {
     WET: 'wet',
     POISON: 'poison',
     SHOCK: 'shock',
-    PANDEMIC: 'pandemic'
+    PANDEMIC: 'pandemic',
+    FREEZE: 'freeze',
+    CORROSION: 'corrosion',
+    FROSTBOLT: 'frostbolt',
+    SANGUINE: 'sanguine',
+    VOLTBLEED: 'voltbleed',
+    FROSTPOISON: 'frostpoison',
+    STORMFIRE: 'stormfire'
 };
+
+export const FUSION_TABLE = [
+    { requires: [STATUS_TYPES.BURN,   STATUS_TYPES.POISON],  result: STATUS_TYPES.CORROSION  },
+    { requires: [STATUS_TYPES.FREEZE, STATUS_TYPES.SHOCK],   result: STATUS_TYPES.FROSTBOLT  },
+    { requires: [STATUS_TYPES.BLEED,  STATUS_TYPES.BURN],    result: STATUS_TYPES.SANGUINE   },
+    { requires: [STATUS_TYPES.SHOCK,  STATUS_TYPES.BLEED],   result: STATUS_TYPES.VOLTBLEED  },
+    { requires: [STATUS_TYPES.FREEZE, STATUS_TYPES.POISON],  result: STATUS_TYPES.FROSTPOISON},
+    { requires: [STATUS_TYPES.BURN,   STATUS_TYPES.SHOCK],   result: STATUS_TYPES.STORMFIRE  },
+];
 
 export class StatusManager {
     constructor(owner) {
@@ -30,12 +52,12 @@ export class StatusManager {
         // --- Elemental Interactions (Neutralization) ---
         if (type === STATUS_TYPES.WET && this.effects.has(STATUS_TYPES.BURN)) {
             this.effects.delete(STATUS_TYPES.BURN);
-            this.showStatusText('neutralized', 'Steam!');
+            this.showStatusText('neutralized', '蒸発！');
             return; // Water puts out fire, consumes the water shot too
         }
         if (type === STATUS_TYPES.BURN && this.effects.has(STATUS_TYPES.WET)) {
             this.effects.delete(STATUS_TYPES.WET);
-            this.showStatusText('neutralized', 'Evaporate!');
+            this.showStatusText('neutralized', '消滅！');
             return; // Fire evaporates water, consumes the fire shot too
         }
 
@@ -74,6 +96,82 @@ export class StatusManager {
                 }
             }
         }
+
+        this.checkFusion(this.owner.game);
+    }
+
+    checkFusion(game) {
+        for (const entry of FUSION_TABLE) {
+            const [typeA, typeB] = entry.requires;
+            if (this.effects.has(typeA) && this.effects.has(typeB)) {
+                // 各1スタック消費
+                this._consumeStack(typeA);
+                this._consumeStack(typeB);
+                
+                // 複合状態異常を付与（duration: 8秒、スタック上限: 5）
+                this.applyStatus(entry.result, 8.0, null, 5);
+
+                // インスタント効果の処理
+                this._handleFusionInstantEffect(entry.result);
+
+                break; // 1回の判定で1つだけ発動
+            }
+        }
+    }
+
+    _consumeStack(type) {
+        const effect = this.effects.get(type);
+        if (!effect) return;
+        effect.stacks -= 1;
+        if (effect.stacks <= 0) this.effects.delete(type);
+    }
+
+    _handleFusionInstantEffect(type) {
+        const owner = this.owner;
+        const game = owner.game;
+        if (!game) return;
+
+        if (type === STATUS_TYPES.FROSTBOLT) {
+            // 付与された瞬間にstunフラグを0.5秒立てる＋次ダメージ×2の倍率バフを付与
+            owner.stunDuration = Math.max(owner.stunDuration || 0, 0.5);
+            owner.frostboltCharge = true; // takeDamageで消費するフラグ
+        } else if (type === STATUS_TYPES.SANGUINE) {
+            // 付与された瞬間に bleed の現スタック数×（スキルダメージ×0.3）の即時ダメージを与える
+            const bleedEffect = this.effects.get(STATUS_TYPES.BLEED);
+            const stacks = bleedEffect ? bleedEffect.stacks + 1 : 1;
+            const skillDmg = owner.lastSkillDamage || 100; 
+            const totalDmg = stacks * (skillDmg * 0.3);
+            owner.takeDamage(totalDmg, '#ff0000', 0, false, 0, 0, 0, false);
+        } else if (type === STATUS_TYPES.VOLTBLEED) {
+            // 付与された瞬間に半径150px以内の別の敵にダメージ（スキルダメージ×0.5）を連鎖。最大3体
+            const skillDmg = owner.lastSkillDamage || 100;
+            const chainDmg = skillDmg * 0.5;
+            let targets = 0;
+            const range = 150;
+
+            const enemies = game.enemies || [];
+            for (const enemy of enemies) {
+                if (enemy === owner || enemy.hp <= 0 || targets >= 3) continue;
+                const dx = enemy.x - owner.x;
+                const dy = enemy.y - owner.y;
+                if (Math.sqrt(dx * dx + dy * dy) <= range) {
+                    enemy.takeDamage(chainDmg, '#ffff00', 0, false, 0, 0, 0, false);
+                    // Visual
+                    game.animations.push({
+                        type: 'lightning_bolt',
+                        x1: owner.x + owner.width / 2,
+                        y1: owner.y + owner.height / 2,
+                        x2: enemy.x + enemy.width / 2,
+                        y2: enemy.y + enemy.height / 2,
+                        color: '#ff0000',
+                        width: 2,
+                        life: 0.2,
+                        maxLife: 0.2
+                    });
+                    targets++;
+                }
+            }
+        }
     }
 
     update(dt) {
@@ -85,8 +183,17 @@ export class StatusManager {
                 effect.tickTimer = (effect.tickTimer || 0) + dt;
                 if (effect.tickTimer >= 1.0) { // Tick every 1 second
                     effect.tickTimer -= 1.0;
-                    const dmg = Math.round(effect.dotValues ? effect.dotValues.reduce((a, b) => a + b, 0) : effect.stacks * 2);
-                    this.owner.takeDamage(dmg, '#ff6600', 0, false, 0, 0, 0, true, null, 0); // Burn mitigated by defense (0 ignore)
+                    
+                    let baseDmg = effect.dotValues ? effect.dotValues.reduce((a, b) => a + b, 0) : effect.stacks * 2;
+                    
+                    // STORMFIRE: burn のDOTダメージを1.5倍にする
+                    if (this.effects.has(STATUS_TYPES.STORMFIRE)) {
+                        baseDmg *= 1.5;
+                    }
+
+                    const dmg = Math.max(1, Math.round(baseDmg));
+                    
+                    this.owner.takeDamage(dmg, '#ff6600', 0, false, 0, 0, 0, true, null, 0.25); // Burn ignores 25% defense
                     this.showStatusText('burn_tick', dmg);
                 }
             }
@@ -94,11 +201,26 @@ export class StatusManager {
             // Handle Damage Over Time (POISON)
             if (type === STATUS_TYPES.POISON) {
                 effect.tickTimer = (effect.tickTimer || 0) + dt;
-                if (effect.tickTimer >= 1.0) { // Tick every 1 second
-                    effect.tickTimer -= 1.0;
-                    const dmg = Math.round(effect.dotValues ? effect.dotValues.reduce((a, b) => a + b, 0) : effect.stacks * 2);
-                    this.owner.takeDamage(dmg, '#800080', 0, false, 0, 0, 0, true, null, 0.25); // Poison ignores 25% defense
+                
+                // FROSTPOISON: poison の tick 間隔を 1.0秒→0.3秒に短縮
+                const tickInterval = this.effects.has(STATUS_TYPES.FROSTPOISON) ? 0.3 : 1.0;
+
+                if (effect.tickTimer >= tickInterval) {
+                    effect.tickTimer -= tickInterval;
+                    
+                    const baseDmg = effect.dotValues ? effect.dotValues.reduce((a, b) => a + b, 0) : effect.stacks * 2;
+                    const dmg = Math.max(1, Math.round(baseDmg));
+                    
+                    this.owner.takeDamage(dmg, '#800080', 0, false, 0, 0, 0, true, null, 0.50); // Poison ignores 50% defense
                     this.showStatusText('poison_tick', dmg);
+                }
+            }
+
+            // CORROSION: Defense reduction is handled in BaseEnemy.takeDamage by checking status.
+            // But we can add a visual effect here if needed.
+            if (type === STATUS_TYPES.CORROSION) {
+                if (Math.random() < 0.1) {
+                    this.owner.game.spawnParticles(this.owner.x + Math.random() * this.owner.width, this.owner.y + Math.random() * this.owner.height, 1, '#adff2f', 0, -10);
                 }
             }
 
@@ -123,60 +245,98 @@ export class StatusManager {
 
     handleTakeDamage(amount, isChain = false) {
         if (isChain) return; // Prevent infinite loops
-        if (!this.effects.has(STATUS_TYPES.SHOCK)) return;
-
-        const effect = this.effects.get(STATUS_TYPES.SHOCK);
-        const stacks = effect.stacks;
-        const chainDamage = Math.floor(amount * (stacks * 0.02));
-
-        if (chainDamage <= 0) return;
 
         const game = this.owner.game;
         if (!game) return;
 
-        // 4 tiles range (assuming 32px tiles = 128px)
-        const range = (game.map ? game.map.tileSize : 32) * 4;
         const centerX = this.owner.x + this.owner.width / 2;
         const centerY = this.owner.y + this.owner.height / 2;
+        const range = (game.map ? game.map.tileSize : 32) * 4;
 
-        // Visual feedback at the source
-        if (Math.random() < 0.3) {
-            game.spawnParticles(centerX, centerY, 5, '#ffff00');
+        // SHOCK: 感電の連鎖処理
+        if (this.effects.has(STATUS_TYPES.SHOCK)) {
+            const effect = this.effects.get(STATUS_TYPES.SHOCK);
+            const stacks = effect.stacks;
+            const chainDamage = Math.floor(amount * (stacks * 0.02));
+
+            if (chainDamage > 0) {
+                // Visual feedback at the source
+                if (Math.random() < 0.3) {
+                    game.spawnParticles(centerX, centerY, 5, '#ffff00');
+                }
+
+                game.enemies.forEach(enemy => {
+                    if (enemy === this.owner || enemy.hp <= 0) return;
+
+                    const dx = (enemy.x + enemy.width / 2) - centerX;
+                    const dy = (enemy.y + enemy.height / 2) - centerY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist <= range) {
+                        // Apply chain damage.
+                        enemy.takeDamage(chainDamage, '#ffff00', 0, false, 0, 0, 0.2, false, null, 0, true);
+                        
+                        // Visual feedback: Lightning Bolt connection
+                        game.animations.push({
+                            type: 'lightning_bolt',
+                            x1: centerX,
+                            y1: centerY,
+                            x2: enemy.x + enemy.width / 2,
+                            y2: enemy.y + enemy.height / 2,
+                            color: '#ffff00',
+                            width: 3,
+                            life: 0.15,
+                            maxLife: 0.15
+                        });
+
+                        game.spawnParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, 3, '#ffff00');
+                    }
+                });
+            }
         }
 
-        game.enemies.forEach(enemy => {
-            if (enemy === this.owner || enemy.hp <= 0) return;
+        // VOLTBLEED: 感電爆血の連鎖処理
+        if (this.effects.has(STATUS_TYPES.VOLTBLEED)) {
+            const voltEffect = this.effects.get(STATUS_TYPES.VOLTBLEED);
+            const voltStacks = voltEffect.stacks;
+            const voltChainDamage = Math.floor(amount * (voltStacks * 0.05));
 
-            const dx = (enemy.x + enemy.width / 2) - centerX;
-            const dy = (enemy.y + enemy.height / 2) - centerY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            if (dist <= range) {
-                // Apply chain damage.
-                // takeDamage params: amount, color, aetherGain, isCrit, knockbackX, knockbackY, stunDuration, silent
-                // Set silent = false so the damage number shows up
-                enemy.takeDamage(chainDamage, '#ffff00', 0, false, 0, 0, 0.2, false);
-                
-                // Visual feedback: Lightning Bolt connection
-                game.animations.push({
-                    type: 'lightning_bolt',
-                    x1: centerX,
-                    y1: centerY,
-                    x2: enemy.x + enemy.width / 2,
-                    y2: enemy.y + enemy.height / 2,
-                    color: '#ffff00',
-                    width: 3,
-                    life: 0.15,
-                    maxLife: 0.15
-                });
-
-                // Visual feedback: small bolt sparks
-                if (game.spawnLightningBurst) {
-                    // Just a small burst or particle
-                    game.spawnParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, 3, '#ffff00');
+            if (voltChainDamage > 0) {
+                // Visual feedback at the source for voltbleed
+                if (Math.random() < 0.3) {
+                    game.spawnParticles(centerX, centerY, 5, '#ff4444');
                 }
+
+                game.enemies.forEach(enemy => {
+                    if (enemy === this.owner || enemy.hp <= 0) return;
+
+                    const dx = (enemy.x + enemy.width / 2) - centerX;
+                    const dy = (enemy.y + enemy.height / 2) - centerY;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist <= range) {
+                        // Apply chain damage (same range as shock)
+                        enemy.takeDamage(voltChainDamage, '#ff4444', 0, false, 0, 0, 0.2, false, null, 0, true);
+                        
+                        // Visual feedback: lightning_bolt (red)
+                        game.animations.push({
+                            type: 'lightning_bolt',
+                            x1: centerX,
+                            y1: centerY,
+                            x2: enemy.x + enemy.width / 2,
+                            y2: enemy.y + enemy.height / 2,
+                            color: '#ff4444',
+                            width: 3,
+                            life: 0.15,
+                            maxLife: 0.15
+                        });
+
+                        // Visual feedback: red sparks
+                        game.spawnParticles(enemy.x + enemy.width / 2, enemy.y + enemy.height / 2, 3, '#ff4444');
+                    }
+                });
             }
-        });
+        }
     }
 
     getDamageMultiplier(baseDamage) {
@@ -226,35 +386,53 @@ export class StatusManager {
         let icon = statusIcons[type];
 
         if (type === STATUS_TYPES.BLEED) {
-            text = `Bleed ${value}`;
+            text = `出血 ${value}`;
             color = '#ff0000';
         } else if (type === STATUS_TYPES.BURN) {
-            text = `Burn ${value}`;
+            text = `炎上 ${value}`;
             color = '#ff6600';
         } else if (type === STATUS_TYPES.WET) {
-            text = `Wet ${value}`;
+            text = `湿潤 ${value}`;
             color = '#00aaff';
         } else if (type === 'burn_tick') {
             text = value; // Just show damage value for ticks, like normal damage
             color = '#ffffff';
         } else if (type === STATUS_TYPES.POISON) {
-            text = `Poison ${value}`;
+            text = `中毒 ${value}`;
             color = '#800080';
         } else if (type === STATUS_TYPES.SLOW) {
-            text = `Slow ${value}`;
+            text = `鈍足 ${value}`;
             color = '#00ffff';
         } else if (type === 'poison_tick') {
             text = value; // Like normal damage
             color = '#ffffff';
         } else if (type === STATUS_TYPES.SHOCK) {
-            text = `Shock ${value}`;
+            text = `感電 ${value}`;
             color = '#ffff00';
         } else if (type === 'neutralized') {
-            text = value; // "Steam!" or "Evaporate!"
+            text = value; // "蒸発！" or "消滅！" (passed from applyStatus)
             color = '#aae6ff';
         } else if (type === STATUS_TYPES.PANDEMIC) {
-            text = 'PANDEMIC';
+            text = '疫病';
             color = '#BF40BF';
+        } else if (type === STATUS_TYPES.CORROSION) {
+            text = `腐食 ${value}`;
+            color = '#adff2f';
+        } else if (type === STATUS_TYPES.FROSTBOLT) {
+            text = `極電 ${value}`;
+            color = '#00ffff';
+        } else if (type === STATUS_TYPES.SANGUINE) {
+            text = `血炎 ${value}`;
+            color = '#ff0000';
+        } else if (type === STATUS_TYPES.VOLTBLEED) {
+            text = `感電爆血 ${value}`;
+            color = '#ff3333';
+        } else if (type === STATUS_TYPES.FROSTPOISON) {
+            text = `凍毒 ${value}`;
+            color = '#8a2be2';
+        } else if (type === STATUS_TYPES.STORMFIRE) {
+            text = `烈火雷鳴 ${value}`;
+            color = '#ff4500';
         }
 
         if (this.owner.game) {

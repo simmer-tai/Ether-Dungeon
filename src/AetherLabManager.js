@@ -8,6 +8,7 @@ export class AetherLabManager {
     static getModifyCost(chip) {
         const rarity = chip.getRarity();
         const nodeCount = chip.getConnectedNodeCount();
+        if (!chip.data) return { gold: 0, fragments: 0 };
         const baseGold = 50 + (chip.data.baseCost * 10);
         const baseFragments = 5 + (rarity === 'rare' ? 5 : rarity === 'epic' ? 15 : rarity === 'legendary' ? 30 : 0);
 
@@ -20,6 +21,7 @@ export class AetherLabManager {
 
     static getDismantleYield(chip) {
         // Returns 50% of upgrade shards spent + base yield
+        if (!chip.data) return { shards: 0 };
         return {
             shards: Math.floor(chip.data.baseCost * 5) + (chip.level - 1) * 10
         };
@@ -102,8 +104,9 @@ export class AetherLabManager {
         else if (materialRarity === 'epic' || materialRarity === 'legendary') newRarity = 'legendary';
 
         // 2. Determine effect inheritance
+        if (!materials[0].data) return false;
         const firstEffect = materials[0].data.effectType;
-        const allSameEffect = materials.every(m => m.data.effectType === firstEffect);
+        const allSameEffect = materials.every(m => m.data && m.data.effectType === firstEffect);
 
         // 3. Select target chip ID
         let pool = chipsDB;
