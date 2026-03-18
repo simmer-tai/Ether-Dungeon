@@ -2,6 +2,7 @@ import { AetherLabManager } from '../AetherLabManager.js';
 import { getFormattedEffect } from '../ui.js';
 import { SaveManager } from '../SaveManager.js';
 import { skillsDB } from '../../data/skills_db.js';
+import { statusIcons } from '../status_effects.js';
 
 export class LabUI {
     static init(game) {
@@ -1321,30 +1322,94 @@ export class LabUI {
         synergyView.style.border = '1px solid rgba(0, 255, 255, 0.1)';
         synergyView.style.fontSize = '11px';
 
+        const STATUS_INLINE_ICONS = {
+            '炎上':     statusIcons.burn,
+            '中毒':     statusIcons.poison,
+            '出血':     statusIcons.bleed,
+            '感電':     statusIcons.shock,
+            '凍結':     statusIcons.freeze,
+            '鈍足':     statusIcons.slow,
+            '湿潤':     statusIcons.wet,
+            '腐食':     statusIcons.corrosion,
+            '極電':     statusIcons.frostbolt,
+            '血炎':     statusIcons.sanguine,
+            '感電爆血': statusIcons.voltbleed,
+            '凍毒':     statusIcons.frostpoison,
+            '烈火雷鳴': statusIcons.stormfire,
+        };
+
+        function renderTextWithStatusIcons(container, text) {
+            const names = Object.keys(STATUS_INLINE_ICONS).sort((a, b) => b.length - a.length);
+            const regex = new RegExp(`(${names.join('|')})`, 'g');
+            const parts = text.split(regex);
+
+            parts.forEach(part => {
+                const icon = STATUS_INLINE_ICONS[part];
+                if (icon && icon.src) {
+                    const img = document.createElement('img');
+                    img.src = icon.src;
+                    img.style.width = '13px';
+                    img.style.height = '13px';
+                    img.style.objectFit = 'contain';
+                    img.style.verticalAlign = 'middle';
+                    img.style.marginRight = '1px';
+                    img.style.marginLeft = '2px';
+                    img.style.flexShrink = '0';
+                    const nameSpan = document.createElement('span');
+                    nameSpan.textContent = part;
+                    nameSpan.style.verticalAlign = 'middle';
+                    container.appendChild(nameSpan);
+                    container.appendChild(img);
+                } else {
+                    container.appendChild(document.createTextNode(part));
+                }
+            });
+        }
+
         const FUSION_DISPLAY = {
             corrosion: {
                 name: '腐食',
-                effect: '「炎上」と「中毒」を同時に付与すると、各1スタックを消費して「腐食」に変換。\n防御力を5%ダウンさせる（最大5スタックで25%ダウン）。',
+                effect: '複合状態異常「腐食」をアンロック\n炎上と中毒を各1スタック以上付与することで腐食状態異常が発生する\n炎上と中毒のスタック合計数に応じて、敵の防御力を最大40%ダウンさせる。',
             },
             frostbolt: {
                 name: '極電',
-                effect: '「凍結」と「感電」を同時に付与すると、各1スタックを消費して「極電」に変換。\n0.5秒間スタンし、次に受けるダメージが2倍になる。',
+                effect: '複合状態異常「極電」をアンロック\n凍結と感電を各1スタック以上付与することで極電状態異常が発生する\n消費したスタック合計数に応じてスタン時間（最大3.5秒）と次に受けるダメージの倍率（最大6.5倍）が増加する。',
             },
             sanguine: {
                 name: '血炎',
-                effect: '「出血」と「炎上」を同時に付与すると、各1スタックを消費して「血炎」に変換。\n出血スタック数 × スキルダメージ30%の即時爆発ダメージを与える。',
+                effect: '複合状態異常「血炎」をアンロック\n出血と炎上を各1スタック以上付与することで血炎状態異常が発生する\n出血と炎上の全スタックを消費して即時爆発。消費スタック合計 × スキルダメージ40%の爆発ダメージを与える。',
             },
             voltbleed: {
                 name: '感電爆血',
-                effect: '「感電」と「出血」を同時に付与すると、各1スタックを消費して「感電爆血」に変換。\n感電と同じく被ダメージ時に半径150px以内の敵へ連鎖するが、伝達量がスタック数 × 5%になる（最大10スタックで50%）。',
+                effect: '複合状態異常「感電爆血」をアンロック\n感電と出血を各1スタック以上付与することで感電爆血状態異常が発生する\n両方が乗っている間、被ダメージのたびに周囲の敵へ連鎖する。連鎖量は感電スタック × 2% ＋ 出血スタック × 3%。',
             },
             frostpoison: {
                 name: '凍毒',
-                effect: '「凍結」と「中毒」を同時に付与すると、各1スタックを消費して「凍毒」に変換。\n中毒のダメージ間隔が1秒から0.3秒に短縮される。',
+                effect: '複合状態異常「凍毒」をアンロック\n凍結と中毒を各1スタック以上付与することで凍毒状態異常が発生する\n凍結中に中毒の全スタックを消費して即時一括ダメージを発生させる。凍結はそのまま残る。',
             },
             stormfire: {
                 name: '烈火雷鳴',
-                effect: '「炎上」と「感電」を同時に付与すると、各1スタックを消費して「烈火雷鳴」に変換。\n炎上の継続ダメージが1.5倍に強化される。',
+                effect: '複合状態異常「烈火雷鳴」をアンロック\n炎上と感電を各1スタック以上付与することで烈火雷鳴状態異常が発生する\n感電が乗っている間、炎上のDoTが感電スタック数 × 15%ずつ強化される（10スタックで+150%）。',
+            },
+            blood_crit: {
+                name: '血の会心',
+                effect: 'クリティカル発生時に確定で「出血」を1スタック付与する。',
+            },
+            storm_speed: {
+                name: '疾風雷鳴',
+                effect: '「感電」の連鎖範囲が移動速度の上昇量に応じて拡大する。',
+            },
+            unyield_bleed: {
+                name: '不屈の出血',
+                effect: '「受け身」発動時に周囲の敵に「出血」を3スタック付与する。',
+            },
+            mastery_strike: {
+                name: '鍛錬の極意',
+                effect: '撃破スタックが50以上のときスキルダメージ上昇の効果が2倍になる。',
+            },
+            mad_gambler: {
+                name: '狂賭博師',
+                effect: '変動幅で最大ダメージ付近（0.75以上）を引いた際、全状態異常（燃焼、出血、感電、毒、凍結）を同時に付与する。',
             },
         };
 
@@ -1462,9 +1527,14 @@ export class LabUI {
             const pillsContainer = card.querySelector('.synergy-pills-container');
             const effectEl = card.querySelector('.synergy-effect');
 
-            display.effect.split('\n').forEach((line, i) => {
-                if (i > 0) effectEl.appendChild(document.createElement('br'));
-                effectEl.appendChild(document.createTextNode(line));
+            display.effect.split('\n').forEach(line => {
+                const lineEl = document.createElement('div');
+                lineEl.style.display = 'flex';
+                lineEl.style.alignItems = 'center';
+                lineEl.style.flexWrap = 'wrap';
+                lineEl.style.gap = '0px';
+                renderTextWithStatusIcons(lineEl, line);
+                effectEl.appendChild(lineEl);
             });
 
             const reqTypes = fusionData.requiredEffectTypes || (fusionType === 'corrosion' ? ['fire_damage_mult', 'poison_damage_mult'] : 

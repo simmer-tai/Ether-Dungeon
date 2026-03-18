@@ -1488,7 +1488,7 @@ export const projectileBehaviors = {
                 gameObj.camera.shake(0.2, 8);
 
                 // 2. Spawn multiple Eruptions (Magma Puddles + Fire Particles)
-                const eruptionCount = 13; // Balanced count
+                const eruptionCount = 6; // Balanced count
                 const spread = 180; // Increased spread for less density
 
                 for (let i = 0; i < eruptionCount; i++) {
@@ -1529,7 +1529,7 @@ export const projectileBehaviors = {
                                 return;
                             }
                             this.life -= dt2;
-                            if (Math.random() < 0.5) {
+                            if (Math.random() < 0.15) {
                                 const isSmoke = Math.random() < 0.3;
                                 gameObj.spawnParticles(
                                     this.x + (Math.random() - 0.5) * this.radius * 0.4,
@@ -1541,6 +1541,11 @@ export const projectileBehaviors = {
                                     { shape: 'circle', shrink: true, size: 6 + Math.random() * 4 }
                                 );
                             }
+
+                            this.damageTimer = (this.damageTimer || 0) + dt2;
+                            if (this.damageTimer < 0.1) return; // 0.1秒ごとにのみ判定
+                            this.damageTimer = 0;
+
                             gameObj.enemies.forEach(e2 => {
                                 const ex2 = (e2.x + e2.width / 2) - this.x;
                                 const ey2 = (e2.y + e2.height / 2) - this.y;
@@ -1565,40 +1570,63 @@ export const projectileBehaviors = {
                             ctx.save();
                             const alpha = Math.min(1, this.life / 0.5);
                             ctx.globalAlpha = alpha * 0.8;
-                            const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
-                            grad.addColorStop(0, '#ff4400');
-                            grad.addColorStop(1, 'rgba(255, 68, 0, 0)');
-                            ctx.fillStyle = grad;
-                            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2); ctx.fill();
-                            const surfaceGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
-                            surfaceGrad.addColorStop(0, 'rgba(255, 68, 0, 0.8)');
-                            surfaceGrad.addColorStop(0.6, 'rgba(255, 68, 0, 0.3)');
-                            surfaceGrad.addColorStop(1, 'rgba(255, 68, 0, 0)');
-                            ctx.fillStyle = surfaceGrad;
-                            ctx.beginPath(); ctx.ellipse(this.x, this.y, this.radius, this.radius * 0.4, 0, 0, Math.PI * 2); ctx.fill();
+
+                            // Cache gradients
+                            if (!this._grad) {
+                                this._grad = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+                                this._grad.addColorStop(0, '#ff4400');
+                                this._grad.addColorStop(1, 'rgba(255, 68, 0, 0)');
+
+                                this._surfaceGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+                                this._surfaceGrad.addColorStop(0, 'rgba(255, 68, 0, 0.8)');
+                                this._surfaceGrad.addColorStop(0.6, 'rgba(255, 68, 0, 0.3)');
+                                this._surfaceGrad.addColorStop(1, 'rgba(255, 68, 0, 0)');
+
+                                this._coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * 0.5);
+                                this._coreGrad.addColorStop(0, '#ffff00');
+                                this._coreGrad.addColorStop(1, 'rgba(255, 187, 0, 0)');
+                            }
+
+                            ctx.translate(this.x, this.y);
+
+                            ctx.fillStyle = this._grad;
+                            ctx.beginPath();
+                            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                            ctx.fill();
+
+                            ctx.fillStyle = this._surfaceGrad;
+                            ctx.beginPath();
+                            ctx.ellipse(0, 0, this.radius, this.radius * 0.4, 0, 0, Math.PI * 2);
+                            ctx.fill();
+
                             const t = (this.maxLife - this.life) * 10 * this.randSpeed + this.randSeed;
                             const emberCount = 14;
                             for (let i = 0; i < emberCount; i++) {
                                 const offset = (i / emberCount) * Math.PI * 2;
                                 const progress = (t * 0.15 + offset) % 1.0;
                                 const spreadX = Math.sin(this.randSeed + i * 2) * (this.radius * 0.25);
-                                const exP = this.x + spreadX * progress;
-                                const eyP = this.y - (this.radius * 1.2 * progress * this.randHeight);
+                                const exP = spreadX * progress;
+                                const eyP = -(this.radius * 1.2 * progress * this.randHeight);
                                 const eSize = (6 + Math.random() * 4) * (1 - progress * 0.7);
                                 let color;
                                 if (progress < 0.4) color = i % 3 === 0 ? '#ffffff' : (i % 3 === 1 ? '#ffff00' : '#ff4400');
                                 else if (progress < 0.7) color = '#662200';
                                 else color = '#111111';
+                                
+                                ctx.save();
                                 ctx.globalAlpha = alpha * (1 - progress);
                                 ctx.fillStyle = color;
                                 ctx.beginPath(); ctx.arc(exP, eyP, eSize, 0, Math.PI * 2); ctx.fill();
+                                ctx.restore();
                             }
-                            const coreGrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius * 0.5);
-                            coreGrad.addColorStop(0, '#ffff00'); coreGrad.addColorStop(1, 'rgba(255, 187, 0, 0)');
-                            ctx.fillStyle = coreGrad;
-                            ctx.beginPath(); ctx.ellipse(this.x, this.y, this.radius * 0.4, this.radius * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+
+                            ctx.fillStyle = this._coreGrad;
+                            ctx.beginPath(); 
+                            ctx.ellipse(0, 0, this.radius * 0.4, this.radius * 0.2, 0, 0, Math.PI * 2); 
+                            ctx.fill();
+                            
                             ctx.restore();
-                        }
+                        },
                     });
                 }
             };

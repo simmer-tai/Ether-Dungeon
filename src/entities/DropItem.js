@@ -194,7 +194,7 @@ export class DropItem extends Entity {
                 // 2. Chip Icon (Small Silhouette)
                 const iconPath = this.chipInstance.data.icon;
                 const iconImg = getCachedImage(iconPath);
-                if (iconImg && iconImg.complete) {
+                if (iconImg && iconImg.complete && iconImg.naturalWidth !== 0) {
                     ctx.save();
                     // Apply silhouette filter (similar to CSS grayscale(1) brightness(2))
                     ctx.filter = 'grayscale(1) brightness(2)';

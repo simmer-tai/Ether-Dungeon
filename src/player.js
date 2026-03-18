@@ -5,6 +5,7 @@ import { skillsDB } from '../data/skills_db.js';
 import { chipsDB } from '../data/chips_db.js';
 import { AetherCircuitManager, ChipInstance } from './AetherCircuitManager.js';
 import { CONFIG } from './config.js';
+import { STATUS_TYPES } from './status_effects.js';
 
 export class Player extends Entity {
     constructor(game, x, y) {
@@ -207,7 +208,14 @@ export class Player extends Entity {
         // Aether Circuit Bonus
         if (this.circuit) {
             const bonuses = this.circuit.getBonuses();
-            mult += bonuses.damageMult;
+            let chipDamageMult = bonuses.damageMult;
+
+            // MASTERY_STRIKE: Double skill damage if 50+ kills AND synergy active
+            if (this.killCount >= 50 && this.circuit.isSynergyActive('mastery_strike')) {
+                chipDamageMult *= 2;
+            }
+
+            mult += chipDamageMult;
             if (this.enrageTimer > 0) {
                 mult += this.enrageBonus;
             }
@@ -1126,6 +1134,28 @@ export class Player extends Entity {
             const bonuses = this.circuit.getBonuses();
             if (bonuses.ukemiChance > 0 && Math.random() < bonuses.ukemiChance) {
                 scaledDamage = Math.ceil(scaledDamage * 0.5);
+
+                // UNYIELDING_BLEED Synergy: Apply 3 stacks of Bleed to nearby enemies
+                if (this.circuit.isSynergyActive('unyield_bleed')) {
+                    const radius = 150;
+                    const enemies = this.game.enemies;
+                    if (enemies) {
+                        enemies.forEach(enemy => {
+                            if (enemy.hp <= 0) return;
+                            const edx = enemy.x - this.x;
+                            const edy = enemy.y - this.y;
+                            if (Math.sqrt(edx * edx + edy * edy) <= radius) {
+                                if (enemy.statusManager) {
+                                    // Apply 3 stacks
+                                    for (let i = 0; i < 3; i++) {
+                                        enemy.statusManager.applyStatus(STATUS_TYPES.BLEED, 5.0, null, 10);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+
                 // Visual feedback for Ukemi (Icon animation similar to Enrage)
                 this.game.spawnParticles(this.x + this.width / 2, this.y + this.height / 2, 5, '#00ffcc');
                 const ukemiIcon = getCachedImage('assets/ui/chips/icon_ukemi.png');

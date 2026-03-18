@@ -310,10 +310,22 @@ export class Enemy extends Entity {
 
         // Gambler's Dice Randomization
         if (this.game.player && this.game.player.circuit) {
-            const gamblerRange = this.game.player.circuit.getBonuses().damageRandomRange || 0;
+            const bonuses = this.game.player.circuit.getBonuses();
+            const gamblerRange = bonuses.damageRandomRange || 0;
             if (gamblerRange > 0) {
-                const multiplier = 1 + (Math.random() * 2 - 1) * gamblerRange;
+                const roll = Math.random() * 2 - 1; // -1 to 1
+                const multiplier = 1 + roll * gamblerRange;
                 amount *= multiplier;
+
+                // MAD_GAMBLER Synergy: Apply all status effects on high rolls (>= 0.75)
+                if (roll >= 0.75 && this.game.player.circuit.isSynergyActive('mad_gambler')) {
+                    if (this.statusManager) {
+                        const duration = 5.0;
+                        [STATUS_TYPES.BURN, STATUS_TYPES.BLEED, STATUS_TYPES.SHOCK, STATUS_TYPES.POISON, STATUS_TYPES.FREEZE].forEach(type => {
+                            this.statusManager.applyStatus(type, duration, amount);
+                        });
+                    }
+                }
             }
         }
 
@@ -322,23 +334,18 @@ export class Enemy extends Entity {
             // Formula: damage = amount * (300 / (300 + effectiveArmor))
             // ignoreDefense is a fraction (e.g. 0.25 for 25% ignore)
             
-            // CORROSION: 1秒ごとに敵の防御力を5%ダウン（最大5スタック＝最大25%ダウン）
-            let corrosionIgnore = 0;
-            if (this.statusManager && this.statusManager.effects.has(STATUS_TYPES.CORROSION)) {
-                const stacks = this.statusManager.effects.get(STATUS_TYPES.CORROSION).stacks;
-                corrosionIgnore = stacks * 0.05;
-            }
-
+            // CORROSION: StatusManager sets owner.corrosionDefenseDown based on stack counts
+            const corrosionIgnore = this.corrosionDefenseDown || 0;
             const totalIgnore = Math.min(1.0, ignoreDefense + corrosionIgnore);
             const effectiveDefense = this.defense * (1 - totalIgnore);
             const multiplier = 300 / (300 + effectiveDefense);
             amount = Math.max(1, Math.round(amount * multiplier));
         }
 
-        // FROSTBOLT: 次ダメージ×2の倍率バフ
-        if (this.frostboltCharge) {
-            amount *= 2;
-            this.frostboltCharge = false; // 消費
+        // FROSTBOLT: 次ダメージ倍率バフ
+        if (this.frostboltNextHitMult) {
+            amount *= this.frostboltNextHitMult;
+            this.frostboltNextHitMult = null; // 消費
         }
 
         // Apply knockback if provided
@@ -377,6 +384,13 @@ export class Enemy extends Entity {
         // Apply Status Effects Damage Multiplier
         let multiplier = this.statusManager ? this.statusManager.getDamageMultiplier(amount) : 1.0;
         amount = Math.round(amount * multiplier);
+
+        // BLOOD_CRIT Synergy: Apply bleed on critical hit
+        if (isCrit && this.game.player && this.game.player.circuit && this.game.player.circuit.isSynergyActive('blood_crit')) {
+            if (this.statusManager) {
+                this.statusManager.applyStatus(STATUS_TYPES.BLEED, 5.0, amount);
+            }
+        }
 
         // No invulnerability check for enemies so they can take rapid damage
         this.hp -= amount;

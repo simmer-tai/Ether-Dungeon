@@ -557,12 +557,17 @@ export class AetherCircuitManager {
 
     getActiveFusions() {
         const FUSION_EFFECT_MAP = {
-            corrosion:   ['fire_damage_mult',    'poison_damage_mult'],
-            frostbolt:   ['ice_damage_mult',     'thunder_damage_mult'],
-            sanguine:    ['blood_damage_mult',   'fire_damage_mult'],
-            voltbleed:   ['thunder_damage_mult', 'blood_damage_mult'],
-            frostpoison: ['ice_damage_mult',     'poison_damage_mult'],
-            stormfire:   ['fire_damage_mult',    'thunder_damage_mult'],
+            corrosion:      ['fire_damage_mult',    'poison_damage_mult'],
+            frostbolt:      ['ice_damage_mult',     'thunder_damage_mult'],
+            sanguine:       ['blood_damage_mult',   'fire_damage_mult'],
+            voltbleed:      ['thunder_damage_mult', 'blood_damage_mult'],
+            frostpoison:    ['ice_damage_mult',     'poison_damage_mult'],
+            stormfire:      ['fire_damage_mult',    'thunder_damage_mult'],
+            blood_crit:     ['crit_rate_add',       'blood_damage_mult'],
+            storm_speed:    ['speed_mult',          'thunder_damage_mult'],
+            unyield_bleed:  ['ukemi_chance',        'blood_damage_mult'],
+            mastery_strike: ['training_kill_buff',  'damage_mult'],
+            mad_gambler:    ['damage_random_range', 'berserker'],
         };
 
         const activeChips = [];
@@ -577,7 +582,13 @@ export class AetherCircuitManager {
 
         const activeFusions = [];
         for (const [fusionType, requiredTypes] of Object.entries(FUSION_EFFECT_MAP)) {
-            const foundChips = requiredTypes.map(type => activeChips.find(c => c.data?.effectType === type));
+            const foundChips = requiredTypes.map(type => {
+                if (fusionType === 'storm_speed' && type === 'speed_mult') {
+                    return activeChips.find(c => c.data?.effectType === 'speed_mult' || c.data?.effectType === 'acceleration_scaling');
+                }
+                return activeChips.find(c => c.data?.effectType === type);
+            });
+
             if (foundChips.every(c => c !== undefined)) {
                 activeFusions.push({
                     fusionType: fusionType,
@@ -589,14 +600,23 @@ export class AetherCircuitManager {
         return activeFusions;
     }
 
+    isSynergyActive(fusionType) {
+        return this.getActiveFusions().some(f => f.fusionType === fusionType);
+    }
+
     getNearFusions() {
         const FUSION_EFFECT_MAP = {
-            corrosion:   ['fire_damage_mult',    'poison_damage_mult'],
-            frostbolt:   ['ice_damage_mult',     'thunder_damage_mult'],
-            sanguine:    ['blood_damage_mult',   'fire_damage_mult'],
-            voltbleed:   ['thunder_damage_mult', 'blood_damage_mult'],
-            frostpoison: ['ice_damage_mult',     'poison_damage_mult'],
-            stormfire:   ['fire_damage_mult',    'thunder_damage_mult'],
+            corrosion:      ['fire_damage_mult',    'poison_damage_mult'],
+            frostbolt:      ['ice_damage_mult',     'thunder_damage_mult'],
+            sanguine:       ['blood_damage_mult',   'fire_damage_mult'],
+            voltbleed:      ['thunder_damage_mult', 'blood_damage_mult'],
+            frostpoison:    ['ice_damage_mult',     'poison_damage_mult'],
+            stormfire:      ['fire_damage_mult',    'thunder_damage_mult'],
+            blood_crit:     ['crit_rate_add',       'blood_damage_mult'],
+            storm_speed:    ['speed_mult',          'thunder_damage_mult'],
+            unyield_bleed:  ['ukemi_chance',        'blood_damage_mult'],
+            mastery_strike: ['training_kill_buff',  'damage_mult'],
+            mad_gambler:    ['damage_random_range', 'berserker'],
         };
 
         const activeChips = [];
@@ -611,7 +631,12 @@ export class AetherCircuitManager {
 
         const nearFusions = [];
         for (const [fusionType, requiredTypes] of Object.entries(FUSION_EFFECT_MAP)) {
-            const foundChips = requiredTypes.map(type => activeChips.find(c => c.data?.effectType === type));
+            const foundChips = requiredTypes.map(type => {
+                if (fusionType === 'storm_speed' && type === 'speed_mult') {
+                    return activeChips.find(c => c.data?.effectType === 'speed_mult' || c.data?.effectType === 'acceleration_scaling');
+                }
+                return activeChips.find(c => c.data?.effectType === type);
+            });
             const missingCount = foundChips.filter(c => c === undefined).length;
             
             if (missingCount === 1) {
